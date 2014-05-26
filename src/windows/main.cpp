@@ -1,10 +1,12 @@
+#include <memory>
 #include <windows.h>
+#include "..\Constants.h"
 #include "WindowsMainWindow.h"
 
 // Windows entry point...
 int WINAPI WinMain(HINSTANCE hInstance,	HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nShowCmd)
 {
-	WindowsMainWindow window(hInstance, nShowCmd, 800, 600);
-	window.Run();
+	std::unique_ptr<WindowsMainWindow> window(new WindowsMainWindow(hInstance, nShowCmd, GRAPHICS_WIDTH, GRAPHICS_HEIGHT));
+	window->Run();
 	return 0;
 }

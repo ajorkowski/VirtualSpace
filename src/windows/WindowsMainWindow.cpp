@@ -1,30 +1,50 @@
-#include <windows.h>
 #include <functional>
+#include <memory>
+#include "..\Constants.h"
 #include "WindowsMainWindow.h"
 #include "WindowsRenderer.h"
 
-WindowsMainWindow::WindowsMainWindow(HINSTANCE instance, int showCmd, int width, int height)
-	: _wndClassName(L"testWindow"),
-	_hwnd(NULL)
+WindowsMainWindow::WindowsMainWindow(HINSTANCE instance, int showCmd, int width, int height) : 
+	m_wndClassName(L"testWindow"),
+	m_hwnd(NULL),
+	m_renderer(NULL),
+	m_width(width),
+	m_height(height)
 {
-	InitializeWindow(instance, showCmd, width, height, true);
+	InitializeWindow(instance, showCmd, width, height);
 }
 
 WindowsMainWindow::~WindowsMainWindow(void)
 {
-	if(_hwnd) {
-		DestroyWindow(_hwnd);
-		_hwnd = NULL;
+	if (m_renderer)
+	{
+		delete m_renderer;
+		m_renderer = NULL;
+	}
+
+	if(m_hwnd) {
+		DestroyWindow(m_hwnd);
+		m_hwnd = NULL;
 	}
 }
 
 int WindowsMainWindow::Run(void)
 {
-	if(!_hwnd) { return 0; }
+	if (!m_hwnd) { return 0; }
+
+	m_renderer = new WindowsRenderer();
+	if (!m_renderer)
+	{
+		return 0;
+	}
+
+	if (!m_renderer->Initialise(m_width, m_height, m_hwnd))
+	{
+		return 0;
+	}
 
 	MSG msg;
 	ZeroMemory(&msg, sizeof(MSG));
-	WindowsRenderer renderer;
 
 	while(true)
     {
@@ -37,14 +57,14 @@ int WindowsMainWindow::Run(void)
 		}
 		else
 		{
-			renderer.Run();
+			m_renderer->Frame();
 		}
 	}
 
 	return msg.wParam;
 }
 
-bool WindowsMainWindow::InitializeWindow(HINSTANCE instance, int showCmd, int width, int height, bool windowed)
+bool WindowsMainWindow::InitializeWindow(HINSTANCE instance, int showCmd, int width, int height)
 {
 	WNDCLASSEX wc;
 	wc.cbSize = sizeof(WNDCLASSEX);
@@ -58,7 +78,7 @@ bool WindowsMainWindow::InitializeWindow(HINSTANCE instance, int showCmd, int wi
 	wc.hCursor = LoadCursor(NULL, IDC_ARROW);
 	wc.hbrBackground = (HBRUSH)(COLOR_WINDOW + 2);
 	wc.lpszMenuName = NULL;
-	wc.lpszClassName = _wndClassName;
+	wc.lpszClassName = m_wndClassName;
 
 	if (!RegisterClassEx(&wc))
 	{
@@ -66,8 +86,8 @@ bool WindowsMainWindow::InitializeWindow(HINSTANCE instance, int showCmd, int wi
 		return false;
 	}
 
-	_hwnd = CreateWindowEx(NULL, 
-		_wndClassName, 
+	m_hwnd = CreateWindowEx(NULL, 
+		m_wndClassName, 
 		L"Test App", 
 		WS_OVERLAPPEDWINDOW, 
 		CW_USEDEFAULT, 
@@ -79,14 +99,14 @@ bool WindowsMainWindow::InitializeWindow(HINSTANCE instance, int showCmd, int wi
 		instance,
 		static_cast<LPVOID>(this));
 
-	if(!_hwnd) 
+	if(!m_hwnd) 
 	{
 		MessageBox(NULL, L"Error creating window", L"Error", MB_OK | MB_ICONERROR);
 		return false;
 	}
 
-	ShowWindow(_hwnd, showCmd);
-	UpdateWindow(_hwnd);
+	ShowWindow(m_hwnd, showCmd);
+	UpdateWindow(m_hwnd);
 	return true;
 }
 

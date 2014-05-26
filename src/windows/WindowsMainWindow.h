@@ -1,6 +1,8 @@
 #pragma once
+#include <memory>
 #include <windows.h>
 #include "..\MainWindow.h"
+#include "WindowsRenderer.h"
 
 class WindowsMainWindow: public MainWindow
 {
@@ -10,10 +12,14 @@ public:
 
 	int Run(void);
 private:
-	LPCTSTR _wndClassName;
-	HWND _hwnd;
+	LPCTSTR m_wndClassName;
+	HWND m_hwnd;
+	int m_width;
+	int m_height;
 
-	bool InitializeWindow(HINSTANCE instance, int showWnd, int width, int height, bool windowed);
+	WindowsRenderer* m_renderer;
+
+	bool InitializeWindow(HINSTANCE instance, int showWnd, int width, int height);
 
 	LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
 	static LRESULT CALLBACK StaticWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);

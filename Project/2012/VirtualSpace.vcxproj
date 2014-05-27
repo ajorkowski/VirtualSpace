@@ -19,7 +19,7 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
-    <PlatformToolset>v120</PlatformToolset>
+    <PlatformToolset>v110</PlatformToolset>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
@@ -78,17 +78,19 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="..\src\windows\D3DDriver.cpp" />
-    <ClCompile Include="..\src\windows\main.cpp" />
-    <ClCompile Include="..\src\windows\WindowsMainWindow.cpp" />
-    <ClCompile Include="..\src\windows\WindowsRenderer.cpp" />
+    <ClCompile Include="..\..\src\windows\D3DDriver.cpp" />
+    <ClCompile Include="..\..\src\windows\main.cpp" />
+    <ClCompile Include="..\..\src\windows\WindowsMainWindow.cpp" />
+    <ClCompile Include="..\..\src\windows\WindowsRenderer.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\src\Constants.h" />
-    <ClInclude Include="..\src\MainWindow.h" />
-    <ClInclude Include="..\src\windows\D3DDriver.h" />
-    <ClInclude Include="..\src\windows\WindowsMainWindow.h" />
-    <ClInclude Include="..\src\windows\WindowsRenderer.h" />
+    <ClInclude Include="..\..\src\Constants.h" />
+    <ClInclude Include="..\..\src\MainWindow.h" />
+    <ClInclude Include="..\..\src\Screen.h" />
+    <ClInclude Include="..\..\src\ScreenManager.h" />
+    <ClInclude Include="..\..\src\windows\D3DDriver.h" />
+    <ClInclude Include="..\..\src\windows\WindowsMainWindow.h" />
+    <ClInclude Include="..\..\src\windows\WindowsRenderer.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

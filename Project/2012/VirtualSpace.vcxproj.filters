@@ -21,33 +21,39 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="..\src\windows\main.cpp">
+    <ClCompile Include="..\..\src\windows\D3DDriver.cpp">
       <Filter>Source Files\windows</Filter>
     </ClCompile>
-    <ClCompile Include="..\src\windows\WindowsMainWindow.cpp">
+    <ClCompile Include="..\..\src\windows\main.cpp">
       <Filter>Source Files\windows</Filter>
     </ClCompile>
-    <ClCompile Include="..\src\windows\WindowsRenderer.cpp">
+    <ClCompile Include="..\..\src\windows\WindowsMainWindow.cpp">
       <Filter>Source Files\windows</Filter>
     </ClCompile>
-    <ClCompile Include="..\src\windows\D3DDriver.cpp">
+    <ClCompile Include="..\..\src\windows\WindowsRenderer.cpp">
       <Filter>Source Files\windows</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\src\MainWindow.h">
+    <ClInclude Include="..\..\src\windows\D3DDriver.h">
+      <Filter>Header Files\windows</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\windows\WindowsMainWindow.h">
+      <Filter>Header Files\windows</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\windows\WindowsRenderer.h">
+      <Filter>Header Files\windows</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\src\Constants.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\src\windows\WindowsMainWindow.h">
-      <Filter>Header Files\windows</Filter>
+    <ClInclude Include="..\..\src\MainWindow.h">
+      <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\src\windows\WindowsRenderer.h">
-      <Filter>Header Files\windows</Filter>
+    <ClInclude Include="..\..\src\ScreenManager.h">
+      <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\src\windows\D3DDriver.h">
-      <Filter>Header Files\windows</Filter>
-    </ClInclude>
-    <ClInclude Include="..\src\Constants.h">
+    <ClInclude Include="..\..\src\Screen.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

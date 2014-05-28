@@ -3,10 +3,24 @@ using SharpDX.Direct3D;
 using SharpDX.Direct3D11;
 using SharpDX.DXGI;
 using SharpDX.Windows;
+using System.Runtime.InteropServices;
 using VirtualSpace.Core;
 
 namespace VirtualSpace.Platform.Windows
 {
+    [StructLayout(LayoutKind.Sequential)]
+    public struct Vertex
+    {
+        public Vector3 position;
+        public Vector2 texture;
+
+        public Vertex(Vector3 pos, Vector2 tex)
+        {
+            position = pos;
+            texture = tex;
+        }
+    }
+
     public sealed class WindowOutputRenderer : IOutputRenderer
     {
         // Window rendering D3 privates
@@ -57,18 +71,14 @@ namespace VirtualSpace.Platform.Windows
 
             _deviceContext.ClearRenderTargetView(_renderView, Color.CornflowerBlue);
 
+            DrawSharedSurface();
+
             _swapChain.Present(0, PresentFlags.None);
         }
 
         private void DrawSharedSurface()
         {
             var result = _sharedSurfaceLock.Acquire(1, 100);
-            switch (result)
-            {
-                case Result.Ok:
-                    break;
-
-            }
             if (result == Result.WaitTimeout)
             {
                 // Try again later...
@@ -78,6 +88,39 @@ namespace VirtualSpace.Platform.Windows
             {
                 throw new SharpDXException(result);
             }
+
+
+            var vertices = new Vertex[]
+            {
+                new Vertex(new Vector3(-1, -1, 0), new Vector2(0, 1)),
+                new Vertex(new Vector3(-1, 1, 0), new Vector2(0, 0)),
+                new Vertex(new Vector3(1, -1, 0), new Vector2(1, 1)),
+                new Vertex(new Vector3(1, -1, 0), new Vector2(1, 1)),
+                new Vertex(new Vector3(-1, 1, 0), new Vector2(0, 0)),
+                new Vertex(new Vector3(1, 1, 0), new Vector2(1, 0)),
+            };
+
+            // Setup shader for shared surface
+            var sharedSurfaceDesc = _sharedSurface.Description;
+            var shaderResource = new ShaderResourceView(_device, _sharedSurface, new ShaderResourceViewDescription
+            {
+                Format = sharedSurfaceDesc.Format,
+                Dimension = ShaderResourceViewDimension.Texture2D,
+                Texture2D = new ShaderResourceViewDescription.Texture2DResource
+                {
+                    MostDetailedMip = sharedSurfaceDesc.MipLevels - 1,
+                    MipLevels = sharedSurfaceDesc.MipLevels
+                }
+            });
+
+            _deviceContext.PixelShader.SetShaderResources(0, shaderResource);
+            _deviceContext.InputAssembler.PrimitiveTopology = PrimitiveTopology.TriangleList;
+
+            var vertexBuffer = Buffer.Create(_device, BindFlags.VertexBuffer, vertices);
+            _deviceContext.InputAssembler.SetVertexBuffers(0, new VertexBufferBinding(vertexBuffer, Utilities.SizeOf<Vertex>(), 0));
+            _deviceContext.Draw(6, 0);
+
+            _sharedSurfaceLock.Release(1);
         }
 
         private void InitializeWindow()

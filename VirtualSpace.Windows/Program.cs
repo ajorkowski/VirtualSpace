@@ -16,10 +16,8 @@ namespace VirtualSpace.Window
             TinyIoCContainer.Current.AutoRegister(new List<Assembly>()
             {
                 typeof(IEnvironment).Assembly,
-                typeof(WindowOutputRenderer).Assembly
+                typeof(Temp).Assembly
             }, true);
-
-            TinyIoCContainer.Current.Register<IOutputRenderer, WindowOutputRenderer>();
 
             var windowsOutput = TinyIoCContainer.Current.Resolve<IOutputRenderer>();
             windowsOutput.Run();

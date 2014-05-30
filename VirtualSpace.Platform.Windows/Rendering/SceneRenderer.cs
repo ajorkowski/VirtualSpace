@@ -1,11 +1,8 @@
 ﻿using SharpDX;
 using SharpDX.Toolkit;
 using SharpDX.Toolkit.Graphics;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+using VirtualSpace.Core.Environment;
+using VirtualSpace.Platform.Windows.Environment;
 
 namespace VirtualSpace.Platform.Windows.Rendering
 {
@@ -15,10 +12,13 @@ namespace VirtualSpace.Platform.Windows.Rendering
 
         private GeometricPrimitive _cube;
         //private Texture2D _cubeTexture;
+        private Vector3 _cubeLighting;
         private Matrix _cubeTransform;
 
         private GeometricPrimitive _plane;
-        //private Texture2D _planeTexture;
+        private ScreenCapture _planeTexture;
+        private Vector3 _planeLighting;
+        private SharpDX.Direct3D11.ShaderResourceView _planeShaderView;
         private Matrix _planeTransform;
 
         private BasicEffect _basicEffect;
@@ -44,8 +44,9 @@ namespace VirtualSpace.Platform.Windows.Rendering
             base.LoadContent();
 
             _basicEffect = ToDisposeContent(new BasicEffect(GraphicsDevice));
-            _basicEffect.EnableDefaultLighting();
-            _basicEffect.TextureEnabled = true;
+            
+            //_basicEffect.EnableDefaultLighting();
+            //
 
             LoadCube();
             LoadPlane();
@@ -55,13 +56,25 @@ namespace VirtualSpace.Platform.Windows.Rendering
         {
             _cube = ToDisposeContent(GeometricPrimitive.Cube.New(GraphicsDevice));
             //_cubeTexture = Content.Load<Texture2D>("logo_large");
+            _cubeLighting = new Vector3(0, 1, 0);
             _cubeTransform = Matrix.Identity;
         }
         private void LoadPlane()
         {
-            _plane = ToDisposeContent(GeometricPrimitive.Plane.New(GraphicsDevice, 50f, 50f));
+            _plane = ToDisposeContent(GeometricPrimitive.Plane.New(GraphicsDevice, 5f, 5f));
             //_planeTexture = Content.Load<Texture2D>("GeneticaMortarlessBlocks");
-            _planeTransform = Matrix.RotationX(-MathUtil.PiOverTwo) * Matrix.Translation(0f, -5f, 0f);
+            _planeTexture = new ScreenCapture((IScreen)null, GraphicsDevice);
+
+            var desc = _planeTexture.ScreenTexture.Description;
+            _planeShaderView = new SharpDX.Direct3D11.ShaderResourceView(GraphicsDevice, _planeTexture.ScreenTexture, new SharpDX.Direct3D11.ShaderResourceViewDescription
+            {
+                Format = desc.Format,
+                Dimension = SharpDX.Direct3D.ShaderResourceViewDimension.Texture2D,
+                Texture2D = new SharpDX.Direct3D11.ShaderResourceViewDescription.Texture2DResource { MipLevels = desc.MipLevels, MostDetailedMip = desc.MipLevels - 1 }
+            });
+
+            _planeLighting = new Vector3(1, 0, 0);
+            _planeTransform = Matrix.RotationX(-MathUtil.PiOverTwo) * Matrix.Translation(0f, -1f, 0f);
         }
 
         public override void Draw(GameTime gameTime)
@@ -69,11 +82,19 @@ namespace VirtualSpace.Platform.Windows.Rendering
             base.Draw(gameTime);
 
             //_basicEffect.Texture = _cubeTexture;
+            _basicEffect.AmbientLightColor = _cubeLighting;
             _basicEffect.World = _cubeTransform;
+            _basicEffect.TextureEnabled = false;
+            _basicEffect.LightingEnabled = true;
             _cube.Draw(_basicEffect);
 
             //_basicEffect.Texture = _planeTexture;
+            //_basicEffect.AmbientLightColor = _planeLighting;
+            _planeTexture.CaptureScreen();
+            _basicEffect.TextureView = _planeShaderView;
             _basicEffect.World = _planeTransform;
+            _basicEffect.TextureEnabled = true;
+            _basicEffect.LightingEnabled = false;
             _plane.Draw(_basicEffect);
         }
 

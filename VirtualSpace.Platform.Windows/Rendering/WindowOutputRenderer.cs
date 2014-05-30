@@ -13,7 +13,10 @@ namespace VirtualSpace.Platform.Windows.Rendering
 
         public WindowOutputRenderer()
         {
-            _device = new GraphicsDeviceManager(this);
+            _device = new GraphicsDeviceManager(this)
+            {
+                DeviceCreationFlags = SharpDX.Direct3D11.DeviceCreationFlags.BgraSupport
+            };
 
             _sceneRenderer = new SceneRenderer(this);
             _cameraProvider = new CameraProvider(this);

@@ -38,9 +38,8 @@
     <WarningLevel>4</WarningLevel>
   </PropertyGroup>
   <ItemGroup>
-    <!-- A reference to the entire .NET Framework is automatically included -->
-  </ItemGroup>
-  <ItemGroup>
+    <Compile Include="Environment\IScreen.cs" />
+    <Compile Include="Environment\IScreenManager.cs" />
     <Compile Include="IEnvironment.cs" />
     <Compile Include="IOutputRenderer.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />

@@ -44,9 +44,6 @@ namespace VirtualSpace.Platform.Windows.Rendering
             base.LoadContent();
 
             _basicEffect = ToDisposeContent(new BasicEffect(GraphicsDevice));
-            
-            //_basicEffect.EnableDefaultLighting();
-            //
 
             LoadCube();
             LoadPlane();
@@ -55,14 +52,12 @@ namespace VirtualSpace.Platform.Windows.Rendering
         private void LoadCube()
         {
             _cube = ToDisposeContent(GeometricPrimitive.Cube.New(GraphicsDevice));
-            //_cubeTexture = Content.Load<Texture2D>("logo_large");
             _cubeLighting = new Vector3(0, 1, 0);
             _cubeTransform = Matrix.Identity;
         }
         private void LoadPlane()
         {
             _plane = ToDisposeContent(GeometricPrimitive.Plane.New(GraphicsDevice, 5f, 5f));
-            //_planeTexture = Content.Load<Texture2D>("GeneticaMortarlessBlocks");
             _planeTexture = new ScreenCapture((IScreen)null, GraphicsDevice);
 
             var desc = _planeTexture.ScreenTexture.Description;
@@ -81,15 +76,12 @@ namespace VirtualSpace.Platform.Windows.Rendering
         {
             base.Draw(gameTime);
 
-            //_basicEffect.Texture = _cubeTexture;
             _basicEffect.AmbientLightColor = _cubeLighting;
             _basicEffect.World = _cubeTransform;
             _basicEffect.TextureEnabled = false;
             _basicEffect.LightingEnabled = true;
             _cube.Draw(_basicEffect);
 
-            //_basicEffect.Texture = _planeTexture;
-            //_basicEffect.AmbientLightColor = _planeLighting;
             _planeTexture.CaptureScreen();
             _basicEffect.TextureView = _planeShaderView;
             _basicEffect.World = _planeTransform;

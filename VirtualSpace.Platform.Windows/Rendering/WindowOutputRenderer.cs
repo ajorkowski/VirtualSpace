@@ -10,6 +10,7 @@ namespace VirtualSpace.Platform.Windows.Rendering
 
         private readonly SceneRenderer _sceneRenderer;
         private readonly CameraProvider _cameraProvider;
+        private readonly FpsRenderer _fpsRenderer;
 
         public WindowOutputRenderer()
         {
@@ -18,8 +19,11 @@ namespace VirtualSpace.Platform.Windows.Rendering
                 DeviceCreationFlags = SharpDX.Direct3D11.DeviceCreationFlags.BgraSupport
             };
 
+            IsMouseVisible = true;
+            
             _sceneRenderer = new SceneRenderer(this);
             _cameraProvider = new CameraProvider(this);
+            _fpsRenderer = new FpsRenderer(this);
 
             Content.RootDirectory = "Content";
         }

@@ -11,6 +11,7 @@ namespace VirtualSpace.Platform.Windows.Environment
         private readonly IScreen _screen;
         private readonly SharpDX.Direct3D11.Texture2D _sharedTexture;
 
+        private IntPtr _desktopDC;
         private int _nScreenWidth;
         private int _nScreenHeight;
 
@@ -24,7 +25,7 @@ namespace VirtualSpace.Platform.Windows.Environment
             _sharedTexture = new SharpDX.Direct3D11.Texture2D(device, new SharpDX.Direct3D11.Texture2DDescription
             {
                 CpuAccessFlags = CpuAccessFlags.None,
-                BindFlags = SharpDX.Direct3D11.BindFlags.RenderTarget | BindFlags.ShaderResource,
+                BindFlags = BindFlags.ShaderResource | BindFlags.RenderTarget,
                 Format = SharpDX.DXGI.Format.B8G8R8A8_UNorm,
                 Height = _nScreenHeight,
                 Width = _nScreenWidth,
@@ -34,6 +35,8 @@ namespace VirtualSpace.Platform.Windows.Environment
                 SampleDescription = new SampleDescription(1, 0),
                 Usage = ResourceUsage.Default
             });
+
+            _desktopDC = GetDC(IntPtr.Zero);
         }
 
         public int Width { get { return _nScreenWidth; } }
@@ -42,58 +45,33 @@ namespace VirtualSpace.Platform.Windows.Environment
 
         public void CaptureScreen()
         {
-            var sharedSurface = _sharedTexture.QueryInterface<Surface1>();
+            var surface = _sharedTexture.QueryInterface<Surface1>();
+            var dest = surface.GetDC(false);
 
-            var hdc = sharedSurface.GetDC(false);
-            var desk = GetDesktopWindow();
-            var hDesktopDC = GetDC(desk);
+            BitBlt(dest, 0, 0, _nScreenWidth, _nScreenHeight, _desktopDC, 0, 0, TernaryRasterOperations.SRCCOPY);
 
-            var hCaptureDC = CreateCompatibleDC(hdc);
-            //var hCaptureBitmap = CreateCompatibleBitmap(hDesktopDC, _nScreenWidth, _nScreenHeight);
-
-            //SelectObject(hCaptureDC, hCaptureBitmap);
-
-            if (!BitBlt(hCaptureDC, 0, 0, _nScreenWidth, _nScreenHeight, hDesktopDC, 0, 0, TernaryRasterOperations.SRCCOPY | TernaryRasterOperations.CAPTUREBLT))
-            {
-                throw new Exception("Problem on copy...");
-            }
-
-            sharedSurface.ReleaseDC();
-            //DeleteObject(hCaptureBitmap);
-            DeleteObject(hCaptureDC);
-            sharedSurface.Dispose();
+            surface.ReleaseDC();
+            surface.Dispose();
         }
 
         public void Dispose()
         {
+            ReleaseDC(IntPtr.Zero, _desktopDC);
             _sharedTexture.Dispose();
         }
-
-        [DllImport("user32.dll")]
-        private static extern IntPtr GetDesktopWindow();
 
         [DllImport("user32.dll", SetLastError = true)]
         private static extern IntPtr GetDC(IntPtr hWnd);
 
-        [DllImport("gdi32.dll", EntryPoint = "CreateCompatibleDC", SetLastError = true)]
-        private static extern IntPtr CreateCompatibleDC([In] IntPtr hdc);
+        [DllImport("user32.dll")]
+        private static extern bool ReleaseDC(IntPtr hWnd, IntPtr hDC);
 
         [DllImport("user32.dll")]
         private static extern int GetSystemMetrics(SystemMetric smIndex);
 
-        [DllImport("gdi32.dll", EntryPoint = "CreateCompatibleBitmap")]
-        private static extern IntPtr CreateCompatibleBitmap([In] IntPtr hdc, int nWidth, int nHeight);
-
         [DllImport("gdi32.dll", EntryPoint = "BitBlt", SetLastError = true)]
         [return: MarshalAs(UnmanagedType.Bool)]
         private static extern bool BitBlt([In] IntPtr hdc, int nXDest, int nYDest, int nWidth, int nHeight, [In] IntPtr hdcSrc, int nXSrc, int nYSrc, TernaryRasterOperations dwRop);
-
-        [DllImport("gdi32.dll", EntryPoint = "SelectObject", SetLastError = true)]
-        private static extern IntPtr SelectObject([In] IntPtr hdc, [In] IntPtr hgdiobj);
-
-        [DllImport("gdi32.dll", EntryPoint = "DeleteObject")]
-        [return: MarshalAs(UnmanagedType.Bool)]
-        private static extern bool DeleteObject([In] IntPtr hObject);
 
         private enum SystemMetric
         {

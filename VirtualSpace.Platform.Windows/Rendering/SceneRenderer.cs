@@ -58,7 +58,7 @@ namespace VirtualSpace.Platform.Windows.Rendering
         private void LoadPlane()
         {
             _plane = ToDisposeContent(GeometricPrimitive.Plane.New(GraphicsDevice, 5f, 5f));
-            _planeTexture = new ScreenCaptureGdi((IScreen)null, GraphicsDevice);
+            _planeTexture = ToDisposeContent(new ScreenCaptureGdi((IScreen)null, GraphicsDevice));
 
             var desc = _planeTexture.ScreenTexture.Description;
             _planeShaderView = new SharpDX.Direct3D11.ShaderResourceView(GraphicsDevice, _planeTexture.ScreenTexture, new SharpDX.Direct3D11.ShaderResourceViewDescription

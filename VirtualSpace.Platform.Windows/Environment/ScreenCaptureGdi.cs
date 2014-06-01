@@ -6,7 +6,7 @@ using VirtualSpace.Core.Environment;
 
 namespace VirtualSpace.Platform.Windows.Environment
 {
-    internal sealed class ScreenCapture : IDisposable
+    internal sealed class ScreenCaptureGdi : IScreenCapture
     {
         private readonly IScreen _screen;
         private readonly SharpDX.Direct3D11.Texture2D _sharedTexture;
@@ -15,7 +15,7 @@ namespace VirtualSpace.Platform.Windows.Environment
         private int _nScreenWidth;
         private int _nScreenHeight;
 
-        public ScreenCapture(IScreen screen, SharpDX.Direct3D11.Device device)
+        public ScreenCaptureGdi(IScreen screen, SharpDX.Direct3D11.Device device)
         {
             _screen = screen;
 

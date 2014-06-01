@@ -55,8 +55,8 @@
     <Reference Include="System.Windows.Forms" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="Environment\ScreenCapture.cs" />
-    <Compile Include="Native\PdhApi.cs" />
+    <Compile Include="Environment\IScreenCapture.cs" />
+    <Compile Include="Environment\ScreenCaptureGdi.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Rendering\CameraProvider.cs" />
     <Compile Include="Rendering\FpsRenderer.cs" />
@@ -75,6 +75,7 @@
       <Name>VirtualSpace.Core</Name>
     </ProjectReference>
   </ItemGroup>
+  <ItemGroup />
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <Import Project="..\packages\SharpDX.2.6.0\build\SharpDX.targets" Condition="Exists('..\packages\SharpDX.2.6.0\build\SharpDX.targets')" />
   <Target Name="EnsureNuGetPackageBuildImports" BeforeTargets="PrepareForBuild">

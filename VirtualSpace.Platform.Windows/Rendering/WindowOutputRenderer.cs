@@ -14,10 +14,7 @@ namespace VirtualSpace.Platform.Windows.Rendering
 
         public WindowOutputRenderer()
         {
-            _device = new GraphicsDeviceManager(this)
-            {
-                DeviceCreationFlags = SharpDX.Direct3D11.DeviceCreationFlags.BgraSupport
-            };
+            _device = new GraphicsDeviceManager(this);
 
             IsMouseVisible = true;
             

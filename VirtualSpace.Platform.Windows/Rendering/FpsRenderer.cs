@@ -1,7 +1,8 @@
-﻿using SharpDX.Toolkit;
+﻿using SharpDX;
+using SharpDX.Toolkit;
+using SharpDX.Toolkit.Graphics;
 using System;
-using System.Runtime.InteropServices;
-using VirtualSpace.Platform.Windows.Native;
+using System.Diagnostics;
 
 namespace VirtualSpace.Platform.Windows.Rendering
 {
@@ -9,14 +10,20 @@ namespace VirtualSpace.Platform.Windows.Rendering
     {
         private const string CpuCounterName = @"\Processor(0)\% Processor Time";
 
+        // FPS timers
         private int _fps;
         private int _count;
         private TimeSpan _endOfSecond;
 
-        private bool _canReadCpu;
-        private PdhQueryHandle _queryHandle;
-        private PdhCounterHandle _counterHandle;
-        private double _cpuUsage;
+        // CPU timers
+        private float _cpu;
+        private float _memory;
+        private PerformanceCounter _cpuCounter;
+        private PerformanceCounter _ramCounter;
+
+        // Rendering
+        private SpriteFont _spriteFont;
+        private SpriteBatch _spriteBatch;
 
         public FpsRenderer(Game game)
             : base(game)
@@ -31,25 +38,33 @@ namespace VirtualSpace.Platform.Windows.Rendering
         {
             base.Initialize();
 
-            // Setup CPU counters
-            _canReadCpu = true;
-            var result = PdhApi.PdhOpenQuery(null, IntPtr.Zero, out _queryHandle);
-            if(result != 0)
+            // Setup CPU/RAM counters
+            var processName = Process.GetCurrentProcess().ProcessName;
+            _cpuCounter = ToDispose(new PerformanceCounter
             {
-                _canReadCpu = false;
-            }
+                CategoryName = "Process",
+                CounterName = "% Processor Time",
+                InstanceName = processName
+            });
 
-            result = PdhApi.PdhAddCounter(_queryHandle, CpuCounterName, IntPtr.Zero, out _counterHandle);
-            if(result != 0)
+            _ramCounter = ToDispose(new PerformanceCounter
             {
-                _canReadCpu = false;
-            }
+                CategoryName = "Process",
+                CounterName = "Working Set",
+                InstanceName = processName
+            });
 
             // Need to do an initial sample
-            if(_canReadCpu)
-            {
-                PdhApi.PdhCollectQueryData(_queryHandle);
-            }
+            _cpuCounter.NextValue();
+            _ramCounter.NextValue();
+        }
+
+        protected override void LoadContent()
+        {
+            base.LoadContent();
+
+            _spriteFont = ToDisposeContent(Content.Load<SpriteFont>("Arial16"));
+            _spriteBatch = ToDisposeContent(new SpriteBatch(GraphicsDevice));
         }
 
         public override void Update(GameTime gameTime)
@@ -63,25 +78,13 @@ namespace VirtualSpace.Platform.Windows.Rendering
                 _count = 0;
 
                 // Cpu calculation
-                if(_canReadCpu)
-                {
-                    var result = PdhApi.PdhCollectQueryData(_queryHandle);
+                _cpu = _cpuCounter.NextValue();
 
-                    if (result == 0)
-                    {
-                        PDH_FMT_COUNTERVALUE value;
-                        result = PdhApi.PdhGetFormattedCounterValue(_counterHandle, PdhFormat.PDH_FMT_DOUBLE, IntPtr.Zero, out value);
-                        if(result == 0 && value.CStatus == 0)
-                        {
-                            _cpuUsage = value.doubleValue;
-                        }
-                    }
-                }
+                // Memory calc
+                _memory = _ramCounter.NextValue() / 1048576.0f; // bytes -> mb
 
                 // Get the next second
                 _endOfSecond = gameTime.TotalGameTime.Add(TimeSpan.FromSeconds(1));
-                
-                Console.WriteLine(string.Format("fps: {0}, cpu: {1}", _fps, _cpuUsage));
             }
 
             base.Update(gameTime);
@@ -89,24 +92,13 @@ namespace VirtualSpace.Platform.Windows.Rendering
 
         public override void Draw(GameTime gameTime)
         {
+            _spriteBatch.Begin();
+
+            _spriteBatch.DrawString(_spriteFont, string.Format("fps: {0}, cpu: {1:0.00}%, mem: {2:0.00}mb", _fps, _cpu, _memory), new Vector2(10, 10), Color.White);
+
+            _spriteBatch.End();
+
             base.Draw(gameTime);
-        }
-
-        protected override void Dispose(bool disposeManagedResources)
-        {
-            if (_queryHandle != null)
-            {
-                _queryHandle.Dispose();
-                _queryHandle = null;
-            }
-
-            if(_counterHandle != null)
-            {
-                _counterHandle.Dispose();
-                _counterHandle = null;
-            }
-
-            base.Dispose(disposeManagedResources);
         }
     }
 }

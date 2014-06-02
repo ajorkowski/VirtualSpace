@@ -16,7 +16,7 @@ namespace VirtualSpace.Platform.Windows.Rendering
         private Matrix _cubeTransform;
 
         private GeometricPrimitive _plane;
-        private ScreenCaptureGdi _planeTexture;
+        private IScreenCapture _planeTexture;
         private Vector3 _planeLighting;
         private SharpDX.Direct3D11.ShaderResourceView _planeShaderView;
         private Matrix _planeTransform;
@@ -57,7 +57,6 @@ namespace VirtualSpace.Platform.Windows.Rendering
         }
         private void LoadPlane()
         {
-            _plane = ToDisposeContent(GeometricPrimitive.Plane.New(GraphicsDevice, 5f, 5f));
             _planeTexture = ToDisposeContent(new ScreenCaptureGdi((IScreen)null, GraphicsDevice));
 
             var desc = _planeTexture.ScreenTexture.Description;
@@ -68,8 +67,10 @@ namespace VirtualSpace.Platform.Windows.Rendering
                 Texture2D = new SharpDX.Direct3D11.ShaderResourceViewDescription.Texture2DResource { MipLevels = desc.MipLevels, MostDetailedMip = desc.MipLevels - 1 }
             });
 
+            _plane = ToDisposeContent(GeometricPrimitive.Plane.New(GraphicsDevice, _planeTexture.Width, _planeTexture.Height));
+
             _planeLighting = new Vector3(1, 0, 0);
-            _planeTransform = Matrix.RotationX(-MathUtil.PiOverTwo) * Matrix.Translation(0f, -1f, 0f);
+            _planeTransform = Matrix.Scaling(0.005f) * Matrix.RotationX(-MathUtil.PiOverTwo) * Matrix.Translation(0f, -1f, 0f);
         }
 
         public override void Draw(GameTime gameTime)
@@ -82,7 +83,7 @@ namespace VirtualSpace.Platform.Windows.Rendering
             _basicEffect.LightingEnabled = true;
             _cube.Draw(_basicEffect);
 
-            _planeTexture.CaptureScreen();
+            _planeTexture.CaptureScreen(GraphicsDevice);
             _basicEffect.TextureView = _planeShaderView;
             _basicEffect.World = _planeTransform;
             _basicEffect.TextureEnabled = true;

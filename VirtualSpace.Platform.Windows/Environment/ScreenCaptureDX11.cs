@@ -7,7 +7,7 @@ using VirtualSpace.Core.Environment;
 
 namespace VirtualSpace.Platform.Windows.Environment
 {
-    public class ScreenCaptureDX11 : IScreenCapture
+    internal sealed class ScreenCaptureDX11 : IScreenCapture
     {
         private static readonly int SizeOfMoveRectangle = Marshal.SizeOf(typeof(OutputDuplicateMoveRectangle));
         private static readonly int SizeOfDirtyRectangle = Marshal.SizeOf(typeof(Rectangle));
@@ -67,7 +67,7 @@ namespace VirtualSpace.Platform.Windows.Environment
         public int Height { get { return _nScreenHeight; } }
         public SharpDX.Direct3D11.Texture2D ScreenTexture { get { return _sharedTexture; } }
 
-        public void CaptureScreen()
+        public void CaptureScreen(SharpDX.Direct3D11.DeviceContext context)
         {
             SharpDX.DXGI.Resource resource; 
             OutputDuplicateFrameInformation frameInfo;

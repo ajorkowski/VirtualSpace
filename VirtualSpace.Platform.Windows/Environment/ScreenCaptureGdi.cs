@@ -11,8 +11,10 @@ namespace VirtualSpace.Platform.Windows.Environment
     internal sealed class ScreenCaptureGdi : IScreenCapture
     {
         private readonly IScreen _screen;
-        private readonly SharpDX.Direct3D11.Texture2D _sharedTexture;
+        private readonly SharpDX.Direct3D11.Texture2D[] _sharedTextures;
         private readonly SharpDX.Direct3D11.Texture2D _renderTexture;
+        private int _currentTextureIndex;
+        private int _currentReadingIndex;
 
         private IntPtr _desktopDC;
         private int _nScreenWidth;
@@ -42,7 +44,8 @@ namespace VirtualSpace.Platform.Windows.Environment
                 Usage = ResourceUsage.Default
             });
 
-            _sharedTexture = new SharpDX.Direct3D11.Texture2D(device, new Texture2DDescription
+            // The shared texture
+            var sharedDesc = new Texture2DDescription
             {
                 CpuAccessFlags = CpuAccessFlags.None,
                 BindFlags = BindFlags.ShaderResource | BindFlags.RenderTarget,
@@ -54,7 +57,15 @@ namespace VirtualSpace.Platform.Windows.Environment
                 ArraySize = 1,
                 SampleDescription = new SampleDescription(1, 0),
                 Usage = ResourceUsage.Default
-            });
+            };
+
+            // Create a mini swap buffer
+            _sharedTextures = new[]
+            {
+                new SharpDX.Direct3D11.Texture2D(device, sharedDesc),
+                new SharpDX.Direct3D11.Texture2D(device, sharedDesc),
+                new SharpDX.Direct3D11.Texture2D(device, sharedDesc)
+            };
 
             _desktopDC = GetDC(IntPtr.Zero);
 
@@ -66,13 +77,27 @@ namespace VirtualSpace.Platform.Windows.Environment
         {
             while (_isRunning)
             {
-                var surface = _sharedTexture.QueryInterface<Surface1>();
-                var dest = surface.GetDC(false);
+                try
+                {
+                    var surface = _sharedTextures[_currentTextureIndex].QueryInterface<Surface1>();
+                    var dest = surface.GetDC(false);
 
-                BitBlt(dest, 0, 0, _nScreenWidth, _nScreenHeight, _desktopDC, 0, 0, TernaryRasterOperations.SRCCOPY);
+                    BitBlt(dest, 0, 0, _nScreenWidth, _nScreenHeight, _desktopDC, 0, 0, TernaryRasterOperations.SRCCOPY);
 
-                surface.ReleaseDC();
-                surface.Dispose();
+                    surface.ReleaseDC();
+                    surface.Dispose();
+
+                    _currentTextureIndex++;
+                    if (_currentTextureIndex >= _sharedTextures.Length)
+                    {
+                        _currentTextureIndex = 0;
+                    }
+                }
+                catch(AccessViolationException)
+                {
+                    // Sometimes the bitblt is a little too fast...
+                    Thread.Sleep(100);
+                }
             }
         }
 
@@ -82,7 +107,13 @@ namespace VirtualSpace.Platform.Windows.Environment
 
         public void CaptureScreen(SharpDX.Direct3D11.DeviceContext context)
         {
-            using(var src = _sharedTexture.QueryInterface<SharpDX.Direct3D11.Resource>())
+            var index = _currentTextureIndex - 1;
+            if(index < 0)
+            {
+                index = _sharedTextures.Length - 1;
+            }
+
+            using(var src = _sharedTextures[index].QueryInterface<SharpDX.Direct3D11.Resource>())
             using (var dest = _renderTexture.QueryInterface<SharpDX.Direct3D11.Resource>())
             {
                 context.CopyResource(src, dest);
@@ -92,7 +123,10 @@ namespace VirtualSpace.Platform.Windows.Environment
         public void Dispose()
         {
             ReleaseDC(IntPtr.Zero, _desktopDC);
-            _sharedTexture.Dispose();
+            foreach(var text in _sharedTextures)
+            {
+                text.Dispose();
+            }
             _renderTexture.Dispose();
 
             _isRunning = false;

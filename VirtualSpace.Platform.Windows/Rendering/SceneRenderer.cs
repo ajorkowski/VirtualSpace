@@ -22,7 +22,7 @@ namespace VirtualSpace.Platform.Windows.Rendering
             Enabled = true;
 
             game.GameSystems.Add(this);
-            game.GameSystems.Add(new Screen.ScreenRendererGdi(game, null));
+            game.GameSystems.Add(new Screen.ScreenRendererDX11(game, null));
         }
 
         public override void Initialize()

@@ -12,6 +12,7 @@ namespace VirtualSpace.Platform.Windows.Rendering.Screen
     {
         private static readonly int SizeOfMoveRectangle = Marshal.SizeOf(typeof(OutputDuplicateMoveRectangle));
         private static readonly int SizeOfDirtyRectangle = Marshal.SizeOf(typeof(Rectangle));
+        private static readonly int SizeOfVertex = Marshal.SizeOf(typeof(SharpDX.Toolkit.Graphics.VertexPositionNormalTexture));
 
         private SharpDX.Direct3D11.Texture2D _sharedTexture;
         private SharpDX.Direct3D11.Texture2D _renderTexture;
@@ -28,6 +29,7 @@ namespace VirtualSpace.Platform.Windows.Rendering.Screen
 
         private int _dirtyBufferLength;
         private Rectangle[] _dirtyBuffer;
+        private SharpDX.Toolkit.Graphics.VertexPositionNormalTexture[] _dirtyVertexBuffer;
 
         private Texture2D _moveTexture;
         private RenderTargetView _dirtyRenderView;
@@ -46,11 +48,9 @@ namespace VirtualSpace.Platform.Windows.Rendering.Screen
 
         protected override void LoadContent()
         {
-            Output desktop;
-            using (var factory = new Factory1())
-            {
-                desktop = factory.Adapters1[0].Outputs[0];
-            }
+            //Output desktop;
+            var factory = new Factory1();
+            var desktop = factory.Adapters1[0].Outputs[0];
 
             _nScreenWidth = desktop.Description.DesktopBounds.Width;
             _nScreenHeight = desktop.Description.DesktopBounds.Height;
@@ -117,16 +117,29 @@ namespace VirtualSpace.Platform.Windows.Rendering.Screen
         {
             var context = _captureDevice.ImmediateContext;
 
-            while (_isRunning)
-            {
+            //while (_isRunning)
+            //{
                 SharpDX.DXGI.Resource resource;
                 OutputDuplicateFrameInformation frameInfo;
-                _outputDuplication.AcquireNextFrame(1000, out frameInfo, out resource);
+                try
+                {
+                    _outputDuplication.AcquireNextFrame(1000, out frameInfo, out resource);
+                }
+                catch(SharpDXException e)
+                {
+                    if(e.ResultCode == Result.WaitTimeout)
+                    {
+                        //continue;
+                    }
+                    throw;
+                }
 
                 var capturedTexture = resource.QueryInterface<Texture2D>();
                 resource.Dispose();
 
-                if (frameInfo.TotalMetadataBufferSize > 0)
+                int bufferSize = 0;
+                var moveCount = 0;
+                if (frameInfo.TotalMetadataBufferSize > SizeOfMoveRectangle)
                 {
                     if (frameInfo.TotalMetadataBufferSize > _moveBufferLength)
                     {
@@ -134,18 +147,25 @@ namespace VirtualSpace.Platform.Windows.Rendering.Screen
                         _moveBuffer = new OutputDuplicateMoveRectangle[frameInfo.TotalMetadataBufferSize / SizeOfMoveRectangle];
                     }
 
-                    int bufferSize;
+                        
                     _outputDuplication.GetFrameMoveRects(_moveBufferLength, _moveBuffer, out bufferSize);
-                    var moveCount = bufferSize / SizeOfMoveRectangle;
+                    moveCount = bufferSize / SizeOfMoveRectangle;
+                }
 
+                int dirtyCount = 0;
+                if (frameInfo.TotalMetadataBufferSize != bufferSize)
+                {
                     if (frameInfo.TotalMetadataBufferSize - bufferSize > _dirtyBufferLength)
                     {
                         _dirtyBufferLength = frameInfo.TotalMetadataBufferSize - bufferSize;
                         _dirtyBuffer = new Rectangle[(_dirtyBufferLength / SizeOfDirtyRectangle)];
                     }
                     _outputDuplication.GetFrameDirtyRects(_dirtyBufferLength, _dirtyBuffer, out bufferSize);
-                    var dirtyCount = bufferSize / SizeOfDirtyRectangle;
+                    dirtyCount = bufferSize / SizeOfDirtyRectangle;
+                }
 
+                if(dirtyCount > 0 || moveCount > 0)
+                {
                     var result = _mutex.Acquire(0, 1000);
                     if (result == Result.WaitTimeout)
                     {
@@ -160,14 +180,15 @@ namespace VirtualSpace.Platform.Windows.Rendering.Screen
 
                     if (dirtyCount > 0)
                     {
-                        //DoDirty(context, dirtyCount, _dirtyBuffer);
+                        DoDirty(context, capturedTexture, dirtyCount, _dirtyBuffer);
                     }
 
                     _mutex.Release(0);
                 }
 
                 capturedTexture.Dispose();
-            }
+                _outputDuplication.ReleaseFrame();
+            //}
         }
 
         private void DoMoves(SharpDX.Direct3D11.DeviceContext context, int moveCount, OutputDuplicateMoveRectangle[] rect)
@@ -201,31 +222,112 @@ namespace VirtualSpace.Platform.Windows.Rendering.Screen
             }
         }
 
-        //private void DoDirty(SharpDX.Direct3D11.DeviceContext context, Texture2D src, int dirtyCount, Rectangle[] rect)
-        //{
-        //    if(_dirtyRenderView == null)
-        //    {
-        //        _dirtyRenderView = new RenderTargetView(_captureDevice, _sharedTexture);
-        //    }
+        private void DoDirty(SharpDX.Direct3D11.DeviceContext context, Texture2D src, int dirtyCount, Rectangle[] rect)
+        {
+            var region = new ResourceRegion() { Front = 0, Back = 0 };
+            for(int i = 0; i < dirtyCount; i++)
+            {
+                region.Left = rect[i].Left;
+                region.Top = rect[i].Top;
+                region.Right = rect[i].Right;
+                region.Bottom = rect[i].Bottom;
 
-        //    var srcDesc = src.Description;
-        //    using(var shader = new ShaderResourceView(_captureDevice, src, new ShaderResourceViewDescription
-        //    {
-        //        Format = srcDesc.Format,
-        //        Dimension = ShaderResourceViewDimension.Texture2D,
-        //        Texture2D = new ShaderResourceViewDescription.Texture2DResource { MipLevels = srcDesc.MipLevels, MostDetailedMip = srcDesc.MipLevels - 1 }
-        //    }))
-        //    {
-        //        context.OutputMerger.BlendFactor = Color4.Black;
-        //        context.OutputMerger.SetRenderTargets(_dirtyRenderView);
-        //        context.PixelShader.SetShaderResources(0, shader);
-        //        context.InputAssembler.PrimitiveTopology = PrimitiveTopology.TriangleList;
+                context.CopySubresourceRegion(src, 0, region, _sharedTexture, 0, rect[i].Left, rect[i].Top);
+            }
 
-        //        for(int i=0; i<dirtyCount; i++)
-        //        {
+            //if (_dirtyRenderView == null)
+            //{
+            //    _dirtyRenderView = new RenderTargetView(_captureDevice, _sharedTexture);
+            //}
 
-        //        }
-        //    }
-        //}
+            //var srcDesc = src.Description;
+            //var shaderDesc = new ShaderResourceViewDescription
+            //{
+            //    Format = srcDesc.Format,
+            //    Dimension = ShaderResourceViewDimension.Texture2D,
+            //    Texture2D = new ShaderResourceViewDescription.Texture2DResource { MipLevels = srcDesc.MipLevels, MostDetailedMip = srcDesc.MipLevels - 1 }
+            //};
+
+            //using (var shader = new ShaderResourceView(_captureDevice, src, shaderDesc))
+            //{
+            //    context.OutputMerger.BlendFactor = Color4.Black;
+            //    context.OutputMerger.SetRenderTargets(_dirtyRenderView);
+            //    context.VertexShader.SetShader();
+            //    context.PixelShader.SetShader();
+            //    context.PixelShader.SetShaderResources(0, shader);
+            //    context.InputAssembler.PrimitiveTopology = PrimitiveTopology.TriangleList;
+
+            //    if(_dirtyVertexBuffer == null || _dirtyVertexBuffer.Length < 6 * dirtyCount)
+            //    {
+            //        _dirtyVertexBuffer = new SharpDX.Toolkit.Graphics.VertexPositionNormalTexture[6 * dirtyCount];
+            //    }
+
+            //    for (int i = 0; i < dirtyCount; i++)
+            //    {
+            //        GetDirtyVector(_dirtyVertexBuffer, i, rect[i]);
+            //    }
+
+            //    using(var buffer = Buffer.Create(_captureDevice, BindFlags.VertexBuffer, _dirtyVertexBuffer, sizeInBytes: SizeOfVertex * 6 * dirtyCount))
+            //    {
+            //        context.InputAssembler.SetVertexBuffers(0, new VertexBufferBinding(buffer, SizeOfVertex, 0));
+            //        context.Rasterizer.SetViewport(0, 0, _nScreenWidth, _nScreenHeight, 0, 1);
+            //        context.Draw(6 * dirtyCount, 0);
+            //    }
+            //}
+        }
+
+        private void GetDirtyVector(SharpDX.Toolkit.Graphics.VertexPositionNormalTexture[] buffer, int i, Rectangle rect)
+        {
+            float width = _nScreenWidth;
+            float height = _nScreenHeight;
+            float centerX = width / 2f;
+            float centerY = height / 2f;
+
+            var left = (rect.Left - centerX) / centerX;
+            var right = (rect.Right - centerX) / centerX;
+            var top = -1 * (rect.Top - centerY) / centerY;
+            var bottom = -1 * (rect.Bottom - centerY) / centerY;
+
+            var leftText = rect.Left / width;
+            var rightText = rect.Right / width;
+            var topText = rect.Top / height;
+            var bottomText = rect.Bottom / height;
+
+            i = i * 6;
+            buffer[i].Position.X = left;
+            buffer[i].Position.Y = bottom;
+            buffer[i].TextureCoordinate.X = leftText;
+            buffer[i].TextureCoordinate.Y = bottomText;
+
+            i++;
+            buffer[i].Position.X = left;
+            buffer[i].Position.Y = top;
+            buffer[i].TextureCoordinate.X = leftText;
+            buffer[i].TextureCoordinate.Y = topText;
+
+            i++;
+            buffer[i].Position.X = right;
+            buffer[i].Position.Y = bottom;
+            buffer[i].TextureCoordinate.X = rightText;
+            buffer[i].TextureCoordinate.Y = bottomText;
+
+            i++;
+            buffer[i].Position.X = right;
+            buffer[i].Position.Y = bottom;
+            buffer[i].TextureCoordinate.X = rightText;
+            buffer[i].TextureCoordinate.Y = bottomText;
+
+            i++;
+            buffer[i].Position.X = left;
+            buffer[i].Position.Y = top;
+            buffer[i].TextureCoordinate.X = leftText;
+            buffer[i].TextureCoordinate.Y = topText;
+
+            i++;
+            buffer[i].Position.X = right;
+            buffer[i].Position.Y = top;
+            buffer[i].TextureCoordinate.X = rightText;
+            buffer[i].TextureCoordinate.Y = topText;
+        }
     }
 }

@@ -6,15 +6,15 @@ using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 using VirtualSpace.Core.Environment;
 
-namespace VirtualSpace.Platform.Windows.Environment
+namespace VirtualSpace.Platform.Windows.Rendering.Screen
 {
-    internal sealed class ScreenCaptureDX11 : IScreenCapture
+    internal sealed class ScreenRendererDX11 : ScreenRenderer
     {
         private static readonly int SizeOfMoveRectangle = Marshal.SizeOf(typeof(OutputDuplicateMoveRectangle));
         private static readonly int SizeOfDirtyRectangle = Marshal.SizeOf(typeof(Rectangle));
-        
-        private readonly IScreen _screen;
-        private readonly SharpDX.Direct3D11.Texture2D _sharedTexture;
+
+        private SharpDX.Direct3D11.Texture2D _sharedTexture;
+        private SharpDX.Direct3D11.Texture2D _renderTexture;
 
         private int _nScreenWidth;
         private int _nScreenHeight;
@@ -35,17 +35,27 @@ namespace VirtualSpace.Platform.Windows.Environment
         private bool _isRunning;
         private Task _captureLoop;
 
-        public ScreenCaptureDX11(IScreen screen, SharpDX.Toolkit.Graphics.GraphicsDevice device)
+        public ScreenRendererDX11(SharpDX.Toolkit.Game game, IScreen screen)
+            : base(game, screen)
         {
-            _screen = screen;
+        }
 
-            Factory1 factory = new Factory1();
-            var desktop = factory.Adapters1[0].Outputs[0];
+        protected override int Width { get { return _nScreenWidth; } }
+        protected override int Height { get { return _nScreenHeight; } }
+        protected override SharpDX.Direct3D11.Texture2D ScreenTexture { get { return _renderTexture; } }
+
+        protected override void LoadContent()
+        {
+            Output desktop;
+            using (var factory = new Factory1())
+            {
+                desktop = factory.Adapters1[0].Outputs[0];
+            }
 
             _nScreenWidth = desktop.Description.DesktopBounds.Width;
             _nScreenHeight = desktop.Description.DesktopBounds.Height;
 
-            _sharedTexture = new SharpDX.Direct3D11.Texture2D(device, new Texture2DDescription
+            _renderTexture = ToDisposeContent(new SharpDX.Direct3D11.Texture2D(GraphicsDevice, new Texture2DDescription
             {
                 CpuAccessFlags = CpuAccessFlags.None,
                 BindFlags = BindFlags.ShaderResource | BindFlags.RenderTarget,
@@ -57,123 +67,112 @@ namespace VirtualSpace.Platform.Windows.Environment
                 ArraySize = 1,
                 SampleDescription = new SampleDescription(1, 0),
                 Usage = ResourceUsage.Default
-            });
+            }));
 
-            _captureDevice = new SharpDX.Direct3D11.Device(DriverType.Hardware);
-            using (var sharedResource = _sharedTexture.QueryInterface<SharpDX.DXGI.Resource1>())
+            _captureDevice = ToDisposeContent(new SharpDX.Direct3D11.Device(DriverType.Hardware));
+            using (var sharedResource = _renderTexture.QueryInterface<SharpDX.DXGI.Resource1>())
             {
-                _captureDevice.OpenSharedResource<Texture2D>(sharedResource.SharedHandle);
+                _sharedTexture = ToDisposeContent(_captureDevice.OpenSharedResource<Texture2D>(sharedResource.SharedHandle));
             }
 
-            _mutex = _sharedTexture.QueryInterface<KeyedMutex>();
-            using(var output = new Output1(desktop.NativePointer))
+            _mutex = ToDisposeContent(_sharedTexture.QueryInterface<KeyedMutex>());
+            using (var output = new Output1(desktop.NativePointer))
             {
-                _outputDuplication = output.DuplicateOutput(_captureDevice);
+                _outputDuplication = ToDisposeContent(output.DuplicateOutput(_captureDevice));
             }
 
             _isRunning = true;
             _captureLoop = Task.Run(() => CaptureLoop());
+
+            base.LoadContent();
         }
 
-        public int Width { get { return _nScreenWidth; } }
-        public int Height { get { return _nScreenHeight; } }
-        public SharpDX.Direct3D11.Texture2D ScreenTexture { get { return _sharedTexture; } }
-
-        public void CaptureScreen(SharpDX.Direct3D11.DeviceContext context)
+        protected override void UnloadContent()
         {
-            // Do nothing...
+            _isRunning = false;
+            if (_captureLoop != null)
+            {
+                _captureLoop.Wait();
+                _captureLoop.Dispose();
+                _captureLoop = null;
+            }
+
+            base.UnloadContent();
         }
 
-        public void Dispose()
+        protected override void Dispose(bool disposeManagedResources)
         {
-            if(_captureDevice != null)
+            _isRunning = false;
+            if (_captureLoop != null)
             {
-                _captureDevice.Dispose();
-                _captureDevice = null;
+                _captureLoop.Wait();
+                _captureLoop.Dispose();
+                _captureLoop = null;
             }
 
-            if(_outputDuplication != null)
-            {
-                _outputDuplication.Dispose();
-                _outputDuplication = null;
-            }
-
-            if(_mutex != null)
-            {
-                _mutex.Dispose();
-                _mutex = null;
-            }
-
-            _sharedTexture.Dispose();
-
-            if(_moveTexture != null)
-            {
-                _moveTexture.Dispose();
-            }
-
-            if(_dirtyRenderView != null)
-            {
-                _dirtyRenderView.Dispose();
-            }
+            base.Dispose(disposeManagedResources);
         }
 
         private void CaptureLoop()
         {
             var context = _captureDevice.ImmediateContext;
 
-            SharpDX.DXGI.Resource resource;
-            OutputDuplicateFrameInformation frameInfo;
-            _outputDuplication.AcquireNextFrame(1000, out frameInfo, out resource);
-
-            var capturedTexture = resource.QueryInterface<Texture2D>();
-            resource.Dispose();
-
-            if (frameInfo.TotalMetadataBufferSize > 0)
+            while (_isRunning)
             {
-                if (frameInfo.TotalMetadataBufferSize > _moveBufferLength)
+                SharpDX.DXGI.Resource resource;
+                OutputDuplicateFrameInformation frameInfo;
+                _outputDuplication.AcquireNextFrame(1000, out frameInfo, out resource);
+
+                var capturedTexture = resource.QueryInterface<Texture2D>();
+                resource.Dispose();
+
+                if (frameInfo.TotalMetadataBufferSize > 0)
                 {
-                    _moveBufferLength = frameInfo.TotalMetadataBufferSize;
-                    _moveBuffer = new OutputDuplicateMoveRectangle[frameInfo.TotalMetadataBufferSize / SizeOfMoveRectangle];
+                    if (frameInfo.TotalMetadataBufferSize > _moveBufferLength)
+                    {
+                        _moveBufferLength = frameInfo.TotalMetadataBufferSize;
+                        _moveBuffer = new OutputDuplicateMoveRectangle[frameInfo.TotalMetadataBufferSize / SizeOfMoveRectangle];
+                    }
+
+                    int bufferSize;
+                    _outputDuplication.GetFrameMoveRects(_moveBufferLength, _moveBuffer, out bufferSize);
+                    var moveCount = bufferSize / SizeOfMoveRectangle;
+
+                    if (frameInfo.TotalMetadataBufferSize - bufferSize > _dirtyBufferLength)
+                    {
+                        _dirtyBufferLength = frameInfo.TotalMetadataBufferSize - bufferSize;
+                        _dirtyBuffer = new Rectangle[(_dirtyBufferLength / SizeOfDirtyRectangle)];
+                    }
+                    _outputDuplication.GetFrameDirtyRects(_dirtyBufferLength, _dirtyBuffer, out bufferSize);
+                    var dirtyCount = bufferSize / SizeOfDirtyRectangle;
+
+                    var result = _mutex.Acquire(0, 1000);
+                    if (result == Result.WaitTimeout)
+                    {
+                        // TODO:
+                    }
+
+                    var desc = _sharedTexture.Description;
+                    if (moveCount > 0)
+                    {
+                        DoMoves(context, moveCount, _moveBuffer);
+                    }
+
+                    if (dirtyCount > 0)
+                    {
+                        //DoDirty(context, dirtyCount, _dirtyBuffer);
+                    }
+
+                    _mutex.Release(0);
                 }
 
-                int bufferSize;
-                _outputDuplication.GetFrameMoveRects(_moveBufferLength, _moveBuffer, out bufferSize);
-                var moveCount = bufferSize / SizeOfMoveRectangle;
-
-                if (frameInfo.TotalMetadataBufferSize - bufferSize > _dirtyBufferLength)
-                {
-                    _dirtyBufferLength = frameInfo.TotalMetadataBufferSize - bufferSize;
-                    _dirtyBuffer = new Rectangle[(_dirtyBufferLength / SizeOfDirtyRectangle)];
-                }
-                _outputDuplication.GetFrameDirtyRects(_dirtyBufferLength, _dirtyBuffer, out bufferSize);
-                var dirtyCount = bufferSize / SizeOfDirtyRectangle;
-
-                var result = _mutex.Acquire(0, 1000);
-                if (result == Result.WaitTimeout)
-                {
-                    // TODO:
-                }
-
-                var desc = _sharedTexture.Description;
-                if (moveCount > 0)
-                {
-                    DoMoves(context, moveCount, _moveBuffer);
-                }
-
-                if (dirtyCount > 0)
-                {
-                    //DoDirty(context, dirtyCount, _dirtyBuffer);
-                }
-
-                _mutex.Release(0);
+                capturedTexture.Dispose();
             }
-
-            capturedTexture.Dispose();
         }
 
         private void DoMoves(SharpDX.Direct3D11.DeviceContext context, int moveCount, OutputDuplicateMoveRectangle[] rect)
         {
-            if(_moveTexture == null)
+            if (_moveTexture == null)
             {
                 var desc = _sharedTexture.Description;
                 desc.BindFlags = BindFlags.RenderTarget;
@@ -181,7 +180,7 @@ namespace VirtualSpace.Platform.Windows.Environment
                 _moveTexture = new Texture2D(_captureDevice, desc);
             }
 
-            for(int i=0; i<moveCount; i++)
+            for (int i = 0; i < moveCount; i++)
             {
                 var currentMove = rect[i];
 

@@ -6,13 +6,12 @@ using System.Threading;
 using System.Threading.Tasks;
 using VirtualSpace.Core.Environment;
 
-namespace VirtualSpace.Platform.Windows.Environment
+namespace VirtualSpace.Platform.Windows.Rendering.Screen
 {
-    internal sealed class ScreenCaptureGdi : IScreenCapture
+    internal sealed class ScreenRendererGdi : ScreenRenderer
     {
-        private readonly IScreen _screen;
-        private readonly SharpDX.Direct3D11.Texture2D[] _sharedTextures;
-        private readonly SharpDX.Direct3D11.Texture2D _renderTexture;
+        private SharpDX.Direct3D11.Texture2D[] _sharedTextures;
+        private SharpDX.Direct3D11.Texture2D _renderTexture;
         private int _currentTextureIndex;
         private int _currentReadingIndex;
 
@@ -23,17 +22,26 @@ namespace VirtualSpace.Platform.Windows.Environment
         private bool _isRunning;
         private Task _captureLoop;
 
-        public ScreenCaptureGdi(IScreen screen, SharpDX.Direct3D11.Device device)
+        public ScreenRendererGdi(SharpDX.Toolkit.Game game, IScreen screen)
+            : base(game, screen)
         {
-            _screen = screen;
+            _desktopDC = IntPtr.Zero;
+        }
 
+        protected override int Width { get { return _nScreenWidth; } }
+        protected override int Height { get { return _nScreenHeight; } }
+        protected override SharpDX.Direct3D11.Texture2D ScreenTexture { get { return _renderTexture; } }
+
+        protected override void LoadContent()
+        {
             _nScreenWidth = GetSystemMetrics(SystemMetric.SM_CXSCREEN);
             _nScreenHeight = GetSystemMetrics(SystemMetric.SM_CYSCREEN);
 
-            _renderTexture = new SharpDX.Direct3D11.Texture2D(device, new Texture2DDescription
+            // Base description
+            var sharedDesc = new Texture2DDescription
             {
                 CpuAccessFlags = CpuAccessFlags.None,
-                BindFlags = BindFlags.ShaderResource,
+                BindFlags = BindFlags.ShaderResource | BindFlags.RenderTarget,
                 Format = SharpDX.DXGI.Format.B8G8R8A8_UNorm,
                 Height = _nScreenHeight,
                 Width = _nScreenWidth,
@@ -42,35 +50,68 @@ namespace VirtualSpace.Platform.Windows.Environment
                 ArraySize = 1,
                 SampleDescription = new SampleDescription(1, 0),
                 Usage = ResourceUsage.Default
-            });
-
-            // The shared texture
-            var sharedDesc = new Texture2DDescription
-            {
-                CpuAccessFlags = CpuAccessFlags.None,
-                BindFlags = BindFlags.ShaderResource | BindFlags.RenderTarget,
-                Format = SharpDX.DXGI.Format.B8G8R8A8_UNorm,
-                Height = _nScreenHeight,
-                Width = _nScreenWidth,
-                OptionFlags = ResourceOptionFlags.GdiCompatible,
-                MipLevels = 1,
-                ArraySize = 1,
-                SampleDescription = new SampleDescription(1, 0),
-                Usage = ResourceUsage.Default
             };
+
+            _renderTexture = ToDisposeContent(new SharpDX.Direct3D11.Texture2D(GraphicsDevice, sharedDesc));
+
+            // The shared Gdi textures
+            sharedDesc.OptionFlags = ResourceOptionFlags.GdiCompatible;
 
             // Create a mini swap buffer
             _sharedTextures = new[]
             {
-                new SharpDX.Direct3D11.Texture2D(device, sharedDesc),
-                new SharpDX.Direct3D11.Texture2D(device, sharedDesc),
-                new SharpDX.Direct3D11.Texture2D(device, sharedDesc)
+                ToDisposeContent(new SharpDX.Direct3D11.Texture2D(GraphicsDevice, sharedDesc)),
+                ToDisposeContent(new SharpDX.Direct3D11.Texture2D(GraphicsDevice, sharedDesc)),
+                ToDisposeContent(new SharpDX.Direct3D11.Texture2D(GraphicsDevice, sharedDesc))
             };
 
             _desktopDC = GetDC(IntPtr.Zero);
 
             _isRunning = true;
             _captureLoop = Task.Run(() => CaptureLoop());
+
+            base.LoadContent();
+        }
+
+        protected override void UnloadContent()
+        {
+            base.UnloadContent();
+
+            if (_desktopDC != IntPtr.Zero)
+            {
+                ReleaseDC(IntPtr.Zero, _desktopDC);
+                _desktopDC = IntPtr.Zero;
+            }
+
+            _isRunning = false;
+            if (_captureLoop != null)
+            {
+                _captureLoop.Wait();
+                _captureLoop.Dispose();
+                _captureLoop = null;
+            }
+        }
+
+        public override void Update(SharpDX.Toolkit.GameTime gameTime)
+        {
+            var index = _currentTextureIndex - 1;
+            if(index < 0)
+            {
+                index = _sharedTextures.Length - 1;
+            }
+
+            if (_currentReadingIndex != index)
+            {
+                using (var src = _sharedTextures[index].QueryInterface<SharpDX.Direct3D11.Resource>())
+                using (var dest = _renderTexture.QueryInterface<SharpDX.Direct3D11.Resource>())
+                {
+                    GraphicsDevice.Copy(src, dest);
+                }
+
+                _currentReadingIndex = index;
+            }
+
+            base.Update(gameTime);
         }
 
         private void CaptureLoop()
@@ -93,7 +134,7 @@ namespace VirtualSpace.Platform.Windows.Environment
                         _currentTextureIndex = 0;
                     }
                 }
-                catch(AccessViolationException)
+                catch (AccessViolationException)
                 {
                     // Sometimes the bitblt is a little too fast...
                     Thread.Sleep(100);
@@ -101,37 +142,23 @@ namespace VirtualSpace.Platform.Windows.Environment
             }
         }
 
-        public int Width { get { return _nScreenWidth; } }
-        public int Height { get { return _nScreenHeight; } }
-        public SharpDX.Direct3D11.Texture2D ScreenTexture { get { return _renderTexture; } }
-
-        public void CaptureScreen(SharpDX.Direct3D11.DeviceContext context)
+        protected override void Dispose(bool disposeManagedResources)
         {
-            var index = _currentTextureIndex - 1;
-            if(index < 0)
+            if (_desktopDC != IntPtr.Zero)
             {
-                index = _sharedTextures.Length - 1;
+                ReleaseDC(IntPtr.Zero, _desktopDC);
+                _desktopDC = IntPtr.Zero;
             }
-
-            using(var src = _sharedTextures[index].QueryInterface<SharpDX.Direct3D11.Resource>())
-            using (var dest = _renderTexture.QueryInterface<SharpDX.Direct3D11.Resource>())
-            {
-                context.CopyResource(src, dest);
-            }
-        }
-
-        public void Dispose()
-        {
-            ReleaseDC(IntPtr.Zero, _desktopDC);
-            foreach(var text in _sharedTextures)
-            {
-                text.Dispose();
-            }
-            _renderTexture.Dispose();
 
             _isRunning = false;
-            _captureLoop.Wait();
-            _captureLoop.Dispose();
+            if (_captureLoop != null)
+            {
+                _captureLoop.Wait();
+                _captureLoop.Dispose();
+                _captureLoop = null;
+            }
+
+            base.Dispose(disposeManagedResources);
         }
 
         [DllImport("user32.dll", SetLastError = true)]

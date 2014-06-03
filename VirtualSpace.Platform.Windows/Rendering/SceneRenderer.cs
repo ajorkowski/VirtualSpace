@@ -1,8 +1,6 @@
 ﻿using SharpDX;
 using SharpDX.Toolkit;
 using SharpDX.Toolkit.Graphics;
-using VirtualSpace.Core.Environment;
-using VirtualSpace.Platform.Windows.Environment;
 
 namespace VirtualSpace.Platform.Windows.Rendering
 {
@@ -15,12 +13,6 @@ namespace VirtualSpace.Platform.Windows.Rendering
         private Vector3 _cubeLighting;
         private Matrix _cubeTransform;
 
-        private GeometricPrimitive _plane;
-        private IScreenCapture _planeTexture;
-        private Vector3 _planeLighting;
-        private SharpDX.Direct3D11.ShaderResourceView _planeShaderView;
-        private Matrix _planeTransform;
-
         private BasicEffect _basicEffect;
 
         public SceneRenderer(Game game)
@@ -30,6 +22,7 @@ namespace VirtualSpace.Platform.Windows.Rendering
             Enabled = true;
 
             game.GameSystems.Add(this);
+            game.GameSystems.Add(new Screen.ScreenRendererGdi(game, null));
         }
 
         public override void Initialize()
@@ -46,7 +39,6 @@ namespace VirtualSpace.Platform.Windows.Rendering
             _basicEffect = ToDisposeContent(new BasicEffect(GraphicsDevice));
 
             LoadCube();
-            LoadPlane();
         }
 
         private void LoadCube()
@@ -54,41 +46,6 @@ namespace VirtualSpace.Platform.Windows.Rendering
             _cube = ToDisposeContent(GeometricPrimitive.Cube.New(GraphicsDevice));
             _cubeLighting = new Vector3(0, 1, 0);
             _cubeTransform = Matrix.Identity;
-        }
-        private void LoadPlane()
-        {
-            _planeTexture = ToDisposeContent(new ScreenCaptureGdi((IScreen)null, GraphicsDevice));
-
-            var desc = _planeTexture.ScreenTexture.Description;
-            _planeShaderView = new SharpDX.Direct3D11.ShaderResourceView(GraphicsDevice, _planeTexture.ScreenTexture, new SharpDX.Direct3D11.ShaderResourceViewDescription
-            {
-                Format = desc.Format,
-                Dimension = SharpDX.Direct3D.ShaderResourceViewDimension.Texture2D,
-                Texture2D = new SharpDX.Direct3D11.ShaderResourceViewDescription.Texture2DResource { MipLevels = desc.MipLevels, MostDetailedMip = desc.MipLevels - 1 }
-            });
-
-            _plane = ToDisposeContent(GeometricPrimitive.Plane.New(GraphicsDevice, _planeTexture.Width, _planeTexture.Height));
-
-            _planeLighting = new Vector3(1, 0, 0);
-            _planeTransform = Matrix.Scaling(0.005f) * Matrix.RotationX(-MathUtil.PiOverTwo) * Matrix.Translation(0f, -1f, 0f);
-        }
-
-        public override void Draw(GameTime gameTime)
-        {
-            base.Draw(gameTime);
-
-            _basicEffect.AmbientLightColor = _cubeLighting;
-            _basicEffect.World = _cubeTransform;
-            _basicEffect.TextureEnabled = false;
-            _basicEffect.LightingEnabled = true;
-            _cube.Draw(_basicEffect);
-
-            _planeTexture.CaptureScreen(GraphicsDevice);
-            _basicEffect.TextureView = _planeShaderView;
-            _basicEffect.World = _planeTransform;
-            _basicEffect.TextureEnabled = true;
-            _basicEffect.LightingEnabled = false;
-            _plane.Draw(_basicEffect);
         }
 
         public override void Update(GameTime gameTime)
@@ -100,6 +57,17 @@ namespace VirtualSpace.Platform.Windows.Rendering
 
             _basicEffect.View = _cameraService.View;
             _basicEffect.Projection = _cameraService.Projection;
+        }
+
+        public override void Draw(GameTime gameTime)
+        {
+            base.Draw(gameTime);
+
+            _basicEffect.AmbientLightColor = _cubeLighting;
+            _basicEffect.World = _cubeTransform;
+            _basicEffect.TextureEnabled = false;
+            _basicEffect.LightingEnabled = true;
+            _cube.Draw(_basicEffect);
         }
     }
 }

@@ -102,11 +102,7 @@ namespace VirtualSpace.Platform.Windows.Rendering.Screen
 
             if (_currentReadingIndex != index)
             {
-                using (var src = _sharedTextures[index].QueryInterface<SharpDX.Direct3D11.Resource>())
-                using (var dest = _renderTexture.QueryInterface<SharpDX.Direct3D11.Resource>())
-                {
-                    GraphicsDevice.Copy(src, dest);
-                }
+                GraphicsDevice.Copy(_sharedTextures[index], _renderTexture);
 
                 _currentReadingIndex = index;
             }

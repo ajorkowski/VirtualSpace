@@ -10,7 +10,6 @@ namespace VirtualSpace.Platform.Windows.Rendering
         private ICameraProvider _cameraService;
 
         private GeometricPrimitive _cube;
-        //private Texture2D _cubeTexture;
         private Vector3 _cubeLighting;
         private Matrix _cubeTransform;
 
@@ -23,7 +22,14 @@ namespace VirtualSpace.Platform.Windows.Rendering
             Enabled = true;
 
             game.GameSystems.Add(this);
-            game.GameSystems.Add(new Screen.ScreenRendererGdi(game, null));
+            if (Screen.ScreenRendererDX11.IsSupported)
+            {
+                Game.GameSystems.Add(new Screen.ScreenRendererDX11(Game, null));
+            }
+            else
+            {
+                Game.GameSystems.Add(new Screen.ScreenRendererGdi(Game, null));
+            }
         }
 
         public override void Initialize()

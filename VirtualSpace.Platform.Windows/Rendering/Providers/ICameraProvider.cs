@@ -1,8 +1,8 @@
 ﻿using SharpDX;
 
-namespace VirtualSpace.Platform.Windows.Rendering
+namespace VirtualSpace.Platform.Windows.Rendering.Providers
 {
-    internal interface ICameraService
+    internal interface ICameraProvider
     {
         Matrix View { get; }
         Matrix Projection { get; }

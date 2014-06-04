@@ -4,7 +4,7 @@ using SharpDX.Direct3D11;
 using SharpDX.DXGI;
 using System.Runtime.InteropServices;
 using System.Threading.Tasks;
-using VirtualSpace.Core.Environment;
+using VirtualSpace.Core.Screen;
 
 namespace VirtualSpace.Platform.Windows.Rendering.Screen
 {
@@ -23,6 +23,7 @@ namespace VirtualSpace.Platform.Windows.Rendering.Screen
         private SharpDX.Direct3D11.Device _captureDevice;
         private OutputDuplication _outputDuplication;
         private KeyedMutex _mutex;
+        private KeyedMutex _renderMutex;
 
         private int _moveBufferLength;
         private OutputDuplicateMoveRectangle[] _moveBuffer;
@@ -69,6 +70,8 @@ namespace VirtualSpace.Platform.Windows.Rendering.Screen
                 Usage = ResourceUsage.Default
             }));
 
+            _renderMutex = ToDisposeContent(_renderTexture.QueryInterface<KeyedMutex>());
+
             _captureDevice = ToDisposeContent(new SharpDX.Direct3D11.Device(DriverType.Hardware));
             using (var sharedResource = _renderTexture.QueryInterface<SharpDX.DXGI.Resource1>())
             {
@@ -100,6 +103,23 @@ namespace VirtualSpace.Platform.Windows.Rendering.Screen
             base.UnloadContent();
         }
 
+        public override void Draw(SharpDX.Toolkit.GameTime gameTime)
+        {
+            // We need to make sure the surface is free!
+            var result = _renderMutex.Acquire(0, 100);
+            if (result != Result.WaitTimeout && result != Result.Ok)
+            {
+                throw new SharpDXException(result);
+            }
+
+            if (result == Result.Ok)
+            {
+                base.Draw(gameTime);
+
+                _renderMutex.Release(0);
+            }
+        }
+
         protected override void Dispose(bool disposeManagedResources)
         {
             _isRunning = false;
@@ -117,8 +137,8 @@ namespace VirtualSpace.Platform.Windows.Rendering.Screen
         {
             var context = _captureDevice.ImmediateContext;
 
-            //while (_isRunning)
-            //{
+            while (_isRunning)
+            {
                 SharpDX.DXGI.Resource resource;
                 OutputDuplicateFrameInformation frameInfo;
                 try
@@ -129,7 +149,7 @@ namespace VirtualSpace.Platform.Windows.Rendering.Screen
                 {
                     if(e.ResultCode == Result.WaitTimeout)
                     {
-                        //continue;
+                        continue;
                     }
                     throw;
                 }
@@ -167,28 +187,33 @@ namespace VirtualSpace.Platform.Windows.Rendering.Screen
                 if(dirtyCount > 0 || moveCount > 0)
                 {
                     var result = _mutex.Acquire(0, 1000);
-                    if (result == Result.WaitTimeout)
+                    if (result != Result.WaitTimeout && result != Result.Ok)
                     {
-                        // TODO:
+                        capturedTexture.Dispose();
+                        _outputDuplication.ReleaseFrame();
+                        throw new SharpDXException(result);
                     }
 
-                    var desc = _sharedTexture.Description;
-                    if (moveCount > 0)
+                    if(result == Result.Ok)
                     {
-                        DoMoves(context, moveCount, _moveBuffer);
-                    }
+                        var desc = _sharedTexture.Description;
+                        if (moveCount > 0)
+                        {
+                            DoMoves(context, moveCount, _moveBuffer);
+                        }
 
-                    if (dirtyCount > 0)
-                    {
-                        DoDirty(context, capturedTexture, dirtyCount, _dirtyBuffer);
-                    }
+                        if (dirtyCount > 0)
+                        {
+                            DoDirty(context, capturedTexture, dirtyCount, _dirtyBuffer);
+                        }
 
-                    _mutex.Release(0);
+                        _mutex.Release(0);
+                    }
                 }
 
                 capturedTexture.Dispose();
                 _outputDuplication.ReleaseFrame();
-            //}
+            }
         }
 
         private void DoMoves(SharpDX.Direct3D11.DeviceContext context, int moveCount, OutputDuplicateMoveRectangle[] rect)

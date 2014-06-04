@@ -4,7 +4,7 @@ using System;
 using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
-using VirtualSpace.Core.Environment;
+using VirtualSpace.Core.Screen;
 
 namespace VirtualSpace.Platform.Windows.Rendering.Screen
 {

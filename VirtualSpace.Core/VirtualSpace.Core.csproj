@@ -38,12 +38,18 @@
     <WarningLevel>4</WarningLevel>
   </PropertyGroup>
   <ItemGroup>
-    <Compile Include="Environment\IScreen.cs" />
-    <Compile Include="Environment\IScreenManager.cs" />
+    <Compile Include="Device\ICamera.cs" />
+    <Compile Include="Environment.cs" />
+    <Compile Include="Screen\IScreen.cs" />
+    <Compile Include="Screen\IScreenManager.cs" />
     <Compile Include="IEnvironment.cs" />
-    <Compile Include="IOutputRenderer.cs" />
+    <Compile Include="Device\IInput.cs" />
+    <Compile Include="Device\Keys.cs" />
+    <Compile Include="Device\ButtonState.cs" />
+    <Compile Include="IDevice.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
+  <ItemGroup />
   <Import Project="$(MSBuildExtensionsPath32)\Microsoft\Portable\$(TargetFrameworkVersion)\Microsoft.Portable.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
        Other similar extension points exist, see Microsoft.Common.targets.

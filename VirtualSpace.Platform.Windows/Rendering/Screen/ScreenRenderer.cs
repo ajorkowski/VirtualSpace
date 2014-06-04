@@ -2,7 +2,8 @@
 using SharpDX.Toolkit;
 using SharpDX.Toolkit.Graphics;
 using System;
-using VirtualSpace.Core.Environment;
+using VirtualSpace.Core.Screen;
+using VirtualSpace.Platform.Windows.Rendering.Providers;
 
 namespace VirtualSpace.Platform.Windows.Rendering.Screen
 {
@@ -10,7 +11,7 @@ namespace VirtualSpace.Platform.Windows.Rendering.Screen
     {
         protected readonly IScreen Screen;
 
-        private ICameraService _cameraService;
+        private ICameraProvider _cameraService;
         private BasicEffect _basicEffect;
 
         private GeometricPrimitive _plane;
@@ -31,7 +32,7 @@ namespace VirtualSpace.Platform.Windows.Rendering.Screen
         {
             base.Initialize();
 
-            _cameraService = Services.GetService<ICameraService>();
+            _cameraService = Services.GetService<ICameraProvider>();
         }
 
         protected override void LoadContent()

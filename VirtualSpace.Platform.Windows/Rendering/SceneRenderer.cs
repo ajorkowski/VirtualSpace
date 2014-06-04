@@ -1,12 +1,13 @@
 ﻿using SharpDX;
 using SharpDX.Toolkit;
 using SharpDX.Toolkit.Graphics;
+using VirtualSpace.Platform.Windows.Rendering.Providers;
 
 namespace VirtualSpace.Platform.Windows.Rendering
 {
     internal sealed class SceneRenderer : GameSystem
     {
-        private ICameraService _cameraService;
+        private ICameraProvider _cameraService;
 
         private GeometricPrimitive _cube;
         //private Texture2D _cubeTexture;
@@ -22,14 +23,14 @@ namespace VirtualSpace.Platform.Windows.Rendering
             Enabled = true;
 
             game.GameSystems.Add(this);
-            game.GameSystems.Add(new Screen.ScreenRendererDX11(game, null));
+            game.GameSystems.Add(new Screen.ScreenRendererGdi(game, null));
         }
 
         public override void Initialize()
         {
             base.Initialize();
 
-            _cameraService = Services.GetService<ICameraService>();
+            _cameraService = Services.GetService<ICameraProvider>();
         }
 
         protected override void LoadContent()

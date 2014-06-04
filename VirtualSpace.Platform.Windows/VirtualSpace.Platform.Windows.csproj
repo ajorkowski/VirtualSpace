@@ -70,6 +70,9 @@
       <SpecificVersion>False</SpecificVersion>
       <HintPath>..\packages\SharpDX.2.6.0\Bin\DirectX11_2-net40\SharpDX.Toolkit.Graphics.dll</HintPath>
     </Reference>
+    <Reference Include="SharpDX.Toolkit.Input">
+      <HintPath>..\packages\SharpDX.2.6.0\Bin\DirectX11_2-net40\SharpDX.Toolkit.Input.dll</HintPath>
+    </Reference>
     <Reference Include="System" />
     <Reference Include="System.Core" />
     <Reference Include="Microsoft.CSharp" />
@@ -77,15 +80,16 @@
     <Reference Include="System.Windows.Forms" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Device.cs" />
+    <Compile Include="Rendering\Providers\KeyboardProvider.cs" />
     <Compile Include="Rendering\Screen\ScreenRendererDX11.cs" />
     <Compile Include="Rendering\Screen\ScreenRendererGdi.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
-    <Compile Include="Rendering\CameraProvider.cs" />
+    <Compile Include="Rendering\Providers\CameraProvider.cs" />
     <Compile Include="Rendering\FpsRenderer.cs" />
-    <Compile Include="Rendering\ICameraService.cs" />
+    <Compile Include="Rendering\Providers\ICameraProvider.cs" />
     <Compile Include="Rendering\SceneRenderer.cs" />
     <Compile Include="Rendering\Screen\ScreenRenderer.cs" />
-    <Compile Include="Temp.cs" />
     <Compile Include="Rendering\WindowOutputRenderer.cs" />
   </ItemGroup>
   <ItemGroup>

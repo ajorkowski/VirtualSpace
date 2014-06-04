@@ -16,11 +16,11 @@ namespace VirtualSpace.Window
             TinyIoCContainer.Current.AutoRegister(new List<Assembly>()
             {
                 typeof(IEnvironment).Assembly,
-                typeof(Temp).Assembly
+                typeof(Device).Assembly
             }, true);
 
-            var windowsOutput = TinyIoCContainer.Current.Resolve<IOutputRenderer>();
-            windowsOutput.Run();
+            var windowsOutput = TinyIoCContainer.Current.Resolve<IDevice>();
+            windowsOutput.Run(TinyIoCContainer.Current.Resolve<IEnvironment>());
         }
     }
 }

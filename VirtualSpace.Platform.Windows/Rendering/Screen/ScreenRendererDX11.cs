@@ -2,6 +2,7 @@
 using SharpDX.Direct3D;
 using SharpDX.Direct3D11;
 using SharpDX.DXGI;
+using System;
 using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 using VirtualSpace.Core.Screen;
@@ -30,6 +31,8 @@ namespace VirtualSpace.Platform.Windows.Rendering.Screen
 
         private int _dirtyBufferLength;
         private Rectangle[] _dirtyBuffer;
+
+        private byte[] _pointerShapeBuffer;
 
         private Texture2D _moveTexture;
 
@@ -208,7 +211,38 @@ namespace VirtualSpace.Platform.Windows.Rendering.Screen
                     dirtyCount = bufferSize / SizeOfDirtyRectangle;
                 }
 
-                if(dirtyCount > 0 || moveCount > 0)
+                if(_pointerShapeBuffer == null || frameInfo.PointerShapeBufferSize > _pointerShapeBuffer.Length)
+                {
+                    _pointerShapeBuffer = new byte[frameInfo.PointerShapeBufferSize];
+                }
+
+                Texture2D pointerTexture = null;
+                if (frameInfo.PointerShapeBufferSize > 0 && frameInfo.PointerPosition.Visible)
+                {
+                    int pointerSize;
+                    OutputDuplicatePointerShapeInformation pointerShapeInfo;
+                    var pinnedBuffer = GCHandle.Alloc(_pointerShapeBuffer, GCHandleType.Pinned);
+                    var pointerBuffer = pinnedBuffer.AddrOfPinnedObject();
+                    _outputDuplication.GetFramePointerShape(_pointerShapeBuffer.Length, pointerBuffer, out pointerSize, out pointerShapeInfo);
+
+                    pointerTexture = new Texture2D(_captureDevice, new Texture2DDescription
+                    {
+                        Width = pointerShapeInfo.Width,
+                        Height = pointerShapeInfo.Height,
+                        MipLevels = 1,
+                        ArraySize = 1,
+                        Format = Format.B8G8R8A8_UNorm,
+                        SampleDescription = new SampleDescription(1, 0),
+                        Usage = ResourceUsage.Default,
+                        BindFlags = BindFlags.ShaderResource,
+                        CpuAccessFlags = CpuAccessFlags.None,
+                        OptionFlags = ResourceOptionFlags.None
+                    }, new DataBox[] { new DataBox(pointerBuffer, pointerShapeInfo.Pitch, 0) });
+
+                    pinnedBuffer.Free();
+                }
+
+                if (dirtyCount > 0 || moveCount > 0 || pointerTexture != null)
                 {
                     var result = _mutex.Acquire(0, 1000);
                     if (result != Result.WaitTimeout && result != Result.Ok)
@@ -231,10 +265,19 @@ namespace VirtualSpace.Platform.Windows.Rendering.Screen
                             DoDirty(context, capturedTexture, dirtyCount, _dirtyBuffer);
                         }
 
+                        if(pointerTexture != null)
+                        {
+                            context.CopySubresourceRegion(pointerTexture, 0, null, _sharedTexture, 0, frameInfo.PointerPosition.Position.X, frameInfo.PointerPosition.Position.Y);
+                        }
+
                         _mutex.Release(0);
                     }
                 }
 
+                if(pointerTexture != null)
+                {
+                    pointerTexture.Dispose();
+                }
                 capturedTexture.Dispose();
                 _outputDuplication.ReleaseFrame();
             }

@@ -21,6 +21,7 @@ namespace VirtualSpace.Window
 
             var windowsOutput = TinyIoCContainer.Current.Resolve<IDevice>();
             windowsOutput.Run(TinyIoCContainer.Current.Resolve<IEnvironment>());
+            TinyIoCContainer.Current.Dispose();
         }
     }
 }

@@ -191,7 +191,6 @@ namespace VirtualSpace.Platform.Windows.Rendering.Screen
                         _moveBuffer = new OutputDuplicateMoveRectangle[frameInfo.TotalMetadataBufferSize / SizeOfMoveRectangle];
                     }
 
-                        
                     _outputDuplication.GetFrameMoveRects(_moveBufferLength, _moveBuffer, out bufferSize);
                     moveCount = bufferSize / SizeOfMoveRectangle;
                 }
@@ -204,6 +203,7 @@ namespace VirtualSpace.Platform.Windows.Rendering.Screen
                         _dirtyBufferLength = frameInfo.TotalMetadataBufferSize - bufferSize;
                         _dirtyBuffer = new Rectangle[(_dirtyBufferLength / SizeOfDirtyRectangle)];
                     }
+
                     _outputDuplication.GetFrameDirtyRects(_dirtyBufferLength, _dirtyBuffer, out bufferSize);
                     dirtyCount = bufferSize / SizeOfDirtyRectangle;
                 }
@@ -220,7 +220,6 @@ namespace VirtualSpace.Platform.Windows.Rendering.Screen
 
                     if(result == Result.Ok)
                     {
-                        context.CopyResource(capturedTexture, _sharedTexture);
                         var desc = _sharedTexture.Description;
                         if (moveCount > 0)
                         {

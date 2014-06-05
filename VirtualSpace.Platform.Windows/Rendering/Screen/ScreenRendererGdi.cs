@@ -1,4 +1,5 @@
-﻿using SharpDX.Direct3D11;
+﻿using SharpDX;
+using SharpDX.Direct3D11;
 using SharpDX.DXGI;
 using System;
 using System.Runtime.InteropServices;
@@ -10,14 +11,17 @@ namespace VirtualSpace.Platform.Windows.Rendering.Screen
 {
     internal sealed class ScreenRendererGdi : ScreenRenderer
     {
-        private SharpDX.Direct3D11.Texture2D[] _sharedTextures;
+        private SharpDX.Direct3D11.Texture2D _gdiTexture;
+        private SharpDX.Direct3D11.Texture2D _sharedTexture;
         private SharpDX.Direct3D11.Texture2D _renderTexture;
-        private int _currentTextureIndex;
-        private int _currentReadingIndex;
 
         private IntPtr _desktopDC;
         private int _nScreenWidth;
         private int _nScreenHeight;
+
+        private SharpDX.Direct3D11.Device _captureDevice;
+        private KeyedMutex _mutex;
+        private KeyedMutex _renderMutex;
 
         private bool _isRunning;
         private Task _captureLoop;
@@ -45,7 +49,7 @@ namespace VirtualSpace.Platform.Windows.Rendering.Screen
                 Format = SharpDX.DXGI.Format.B8G8R8A8_UNorm,
                 Height = _nScreenHeight,
                 Width = _nScreenWidth,
-                OptionFlags = ResourceOptionFlags.None,
+                OptionFlags = ResourceOptionFlags.SharedKeyedmutex,
                 MipLevels = 1,
                 ArraySize = 1,
                 SampleDescription = new SampleDescription(1, 0),
@@ -53,17 +57,18 @@ namespace VirtualSpace.Platform.Windows.Rendering.Screen
             };
 
             _renderTexture = ToDisposeContent(new SharpDX.Direct3D11.Texture2D(GraphicsDevice, sharedDesc));
+            _renderMutex = ToDisposeContent(_renderTexture.QueryInterface<KeyedMutex>());
+
+            _captureDevice = ToDisposeContent(new SharpDX.Direct3D11.Device(SharpDX.Direct3D.DriverType.Hardware));
+            using (var sharedResource = _renderTexture.QueryInterface<SharpDX.DXGI.Resource1>())
+            {
+                _sharedTexture = ToDisposeContent(_captureDevice.OpenSharedResource<Texture2D>(sharedResource.SharedHandle));
+            }
+            _mutex = ToDisposeContent(_sharedTexture.QueryInterface<KeyedMutex>());
 
             // The shared Gdi textures
             sharedDesc.OptionFlags = ResourceOptionFlags.GdiCompatible;
-
-            // Create a mini swap buffer
-            _sharedTextures = new[]
-            {
-                ToDisposeContent(new SharpDX.Direct3D11.Texture2D(GraphicsDevice, sharedDesc)),
-                ToDisposeContent(new SharpDX.Direct3D11.Texture2D(GraphicsDevice, sharedDesc)),
-                ToDisposeContent(new SharpDX.Direct3D11.Texture2D(GraphicsDevice, sharedDesc))
-            };
+            _gdiTexture = ToDisposeContent(new SharpDX.Direct3D11.Texture2D(_captureDevice, sharedDesc));
 
             _desktopDC = GetDC(IntPtr.Zero);
 
@@ -92,31 +97,31 @@ namespace VirtualSpace.Platform.Windows.Rendering.Screen
             }
         }
 
-        public override void Update(SharpDX.Toolkit.GameTime gameTime)
+        public override void Draw(SharpDX.Toolkit.GameTime gameTime)
         {
-            var index = _currentTextureIndex - 1;
-            if(index < 0)
+            // We need to make sure the surface is free!
+            var result = _renderMutex.Acquire(0, 100);
+            if (result != Result.WaitTimeout && result != Result.Ok)
             {
-                index = _sharedTextures.Length - 1;
+                throw new SharpDXException(result);
             }
 
-            if (_currentReadingIndex != index)
+            if (result == Result.Ok)
             {
-                GraphicsDevice.Copy(_sharedTextures[index], _renderTexture);
+                base.Draw(gameTime);
 
-                _currentReadingIndex = index;
+                _renderMutex.Release(0);
             }
-
-            base.Update(gameTime);
         }
 
         private void CaptureLoop()
         {
+            var context = _captureDevice.ImmediateContext;
             while (_isRunning)
             {
                 try
                 {
-                    var surface = _sharedTextures[_currentTextureIndex].QueryInterface<Surface1>();
+                    var surface = _gdiTexture.QueryInterface<Surface1>();
                     var dest = surface.GetDC(false);
 
                     BitBlt(dest, 0, 0, _nScreenWidth, _nScreenHeight, _desktopDC, 0, 0, TernaryRasterOperations.SRCCOPY);
@@ -124,10 +129,17 @@ namespace VirtualSpace.Platform.Windows.Rendering.Screen
                     surface.ReleaseDC();
                     surface.Dispose();
 
-                    _currentTextureIndex++;
-                    if (_currentTextureIndex >= _sharedTextures.Length)
+                    var result = _mutex.Acquire(0, 1000);
+                    if (result != Result.WaitTimeout && result != Result.Ok)
                     {
-                        _currentTextureIndex = 0;
+                        throw new SharpDXException(result);
+                    }
+
+                    if (result == Result.Ok)
+                    {
+                        context.CopyResource(_gdiTexture, _sharedTexture);
+
+                        _mutex.Release(0);
                     }
                 }
                 catch (AccessViolationException)

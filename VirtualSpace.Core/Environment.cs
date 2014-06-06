@@ -1,5 +1,6 @@
 ﻿using System;
 using VirtualSpace.Core.Device;
+using VirtualSpace.Core.Screen;
 
 namespace VirtualSpace.Core
 {
@@ -7,12 +8,19 @@ namespace VirtualSpace.Core
     {
         private readonly IDevice _device;
         private readonly IInput _input;
+        private readonly IScreen _desktop;
 
         public Environment(IDevice device)
         {
             _device = device;
             _input = device.Input;
+            _desktop = new Screen.Screen { ScreenSize = 17.2f };
             VSync = true;
+        }
+
+        public void Initialise()
+        {
+            _device.Camera.MoveTo(0, 0, 20);
         }
 
         public void Update(TimeSpan totalGameTime, TimeSpan elapsedGameTime, bool isRunningSlowly)
@@ -42,12 +50,12 @@ namespace VirtualSpace.Core
 
             if (_input.IsDown(Keys.W))
             {
-                z += .002f * (float)elapsedGameTime.TotalMilliseconds;
+                z -= .002f * (float)elapsedGameTime.TotalMilliseconds;
             }
 
             if (_input.IsDown(Keys.S))
             {
-                z -= .002f * (float)elapsedGameTime.TotalMilliseconds;
+                z += .002f * (float)elapsedGameTime.TotalMilliseconds;
             }
 
             if (_input.IsDown(Keys.A))

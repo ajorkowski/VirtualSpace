@@ -15,7 +15,6 @@ namespace VirtualSpace.Platform.Windows.Rendering.Screen
         private BasicEffect _basicEffect;
 
         private GeometricPrimitive _plane;
-        private Vector3 _planeLighting;
         private SharpDX.Direct3D11.ShaderResourceView _planeShaderView;
         private Matrix _planeTransform;
 
@@ -56,10 +55,10 @@ namespace VirtualSpace.Platform.Windows.Rendering.Screen
                 Texture2D = new SharpDX.Direct3D11.ShaderResourceViewDescription.Texture2DResource { MipLevels = desc.MipLevels, MostDetailedMip = desc.MipLevels - 1 }
             }));
 
-            _plane = ToDisposeContent(GeometricPrimitive.Plane.New(GraphicsDevice, Width, Height));
+            //_plane = ToDisposeContent(GeometricPrimitive.Plane.New(GraphicsDevice, Width, Height));
+            _plane = ToDisposeContent(CreateCurvedSurface(GraphicsDevice, Width, Width, Height, 100));
 
-            _planeLighting = new Vector3(1, 0, 0);
-            _planeTransform = Matrix.Scaling(0.005f) * Matrix.RotationX(-MathUtil.PiOverTwo) * Matrix.Translation(0f, -1f, 0f);
+            _planeTransform = Matrix.Scaling(6.7f / Width); // Make it 6.7m wide...
             _basicEffect.TextureView = _planeShaderView;
             _basicEffect.World = _planeTransform;
         }
@@ -81,6 +80,67 @@ namespace VirtualSpace.Platform.Windows.Rendering.Screen
 
         protected abstract int Width { get; }
         protected abstract int Height { get; }
-        protected abstract SharpDX.Direct3D11.Texture2D ScreenTexture { get; } 
+        protected abstract SharpDX.Direct3D11.Texture2D ScreenTexture { get; }
+
+        private static GeometricPrimitive CreateCurvedSurface(GraphicsDevice device, float distance, float width, float height, int tessellation)
+        {
+            if (tessellation < 1)
+            {
+                throw new ArgumentOutOfRangeException("tessellation", "tessellation must be > 0");
+            }
+
+            // Setup memory
+            var vertices = new VertexPositionNormalTexture[tessellation * 2 + 2];
+            var indices = new int[tessellation * 6];
+
+            UpdateCurvedVectors(vertices, distance, width, height);
+
+            var currentIndex = 0;
+            for (var i = 0; i < tessellation; i++)
+            {
+                var iBase = i * 2;
+                indices[currentIndex++] = iBase;
+                indices[currentIndex++] = iBase + 1;
+                indices[currentIndex++] = iBase + 3;
+
+                indices[currentIndex++] = iBase;
+                indices[currentIndex++] = iBase + 3;
+                indices[currentIndex++] = iBase + 2;
+            }
+
+            return new GeometricPrimitive(device, vertices, indices) { Name = "Half cylinder" }; 
+        }
+
+        private static void UpdateCurvedVectors(VertexPositionNormalTexture[] vertices, float distance, float width, float height)
+        {
+            var tessellation = vertices.Length / 2 - 1;
+            var invTes = 1.0f / tessellation;
+
+            var totalAngle = width / distance;
+            var deltaAngle = totalAngle * invTes;
+            var sizeY = height / 2;
+            var startAngle = totalAngle / 2;
+
+            var currentVertex = 0;
+
+            for (var i = 0; i <= tessellation; i++)
+            {
+                var currentAngle = startAngle - deltaAngle * i;
+
+                // Top coord
+                var x = distance * (float)Math.Sin(currentAngle);
+                var z = distance * (1 - (float)Math.Cos(currentAngle)); // Will be positive, means towards the user in RHS
+                var position = new Vector3(x, sizeY, z);
+                var normal = new Vector3(-x, 0, -z); // shared normal for both points
+                normal.Normalize();
+                var textCoord = new Vector2(1 - i * invTes, 0);
+                vertices[currentVertex++] = new VertexPositionNormalTexture(position, normal, textCoord);
+
+                // Bottom coord
+                position = new Vector3(x, -sizeY, z);
+                textCoord = new Vector2(1 - i * invTes, 1);
+                vertices[currentVertex++] = new VertexPositionNormalTexture(position, normal, textCoord);
+            }
+        }
     }
 }

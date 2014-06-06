@@ -124,7 +124,14 @@ namespace VirtualSpace.Platform.Windows.Rendering.Screen
                     var surface = _gdiTexture.QueryInterface<Surface1>();
                     var dest = surface.GetDC(false);
 
-                    BitBlt(dest, 0, 0, _nScreenWidth, _nScreenHeight, _desktopDC, 0, 0, TernaryRasterOperations.SRCCOPY);
+                    BitBlt(dest, 0, 0, _nScreenWidth, _nScreenHeight, _desktopDC, 0, 0, TernaryRasterOperations.SRCCOPY | TernaryRasterOperations.CAPTUREBLT);
+
+                    // Get mouse info
+                    CURSORINFO pci;
+                    pci.cbSize = Marshal.SizeOf(typeof(CURSORINFO));
+                    GetCursorInfo(out pci);
+
+                    DrawIcon(dest, pci.ptScreenPos.x, pci.ptScreenPos.y, pci.hCursor);
 
                     surface.ReleaseDC();
                     surface.Dispose();
@@ -177,6 +184,33 @@ namespace VirtualSpace.Platform.Windows.Rendering.Screen
 
         [DllImport("user32.dll")]
         private static extern int GetSystemMetrics(SystemMetric smIndex);
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct POINT
+        {
+            public Int32 x;
+            public Int32 y;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct CURSORINFO
+        {
+            public Int32 cbSize;        // Specifies the size, in bytes, of the structure. 
+            // The caller must set this to Marshal.SizeOf(typeof(CURSORINFO)).
+            public Int32 flags;         // Specifies the cursor state. This parameter can be one of the following values:
+            //    0             The cursor is hidden.
+            //    CURSOR_SHOWING    The cursor is showing.
+            public IntPtr hCursor;          // Handle to the cursor. 
+            public POINT ptScreenPos;       // A POINT structure that receives the screen coordinates of the cursor. 
+        }
+
+        [DllImport("user32.dll")]
+        private static extern bool GetCursorInfo(out CURSORINFO pci);
+
+        [DllImport("user32.dll")]
+        private static extern bool DrawIcon(IntPtr hDC, int X, int Y, IntPtr hIcon);
+
+        private const Int32 CURSOR_SHOWING = 0x00000001;
 
         [DllImport("gdi32.dll", EntryPoint = "BitBlt", SetLastError = true)]
         [return: MarshalAs(UnmanagedType.Bool)]

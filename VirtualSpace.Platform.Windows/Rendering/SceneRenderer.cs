@@ -22,6 +22,14 @@ namespace VirtualSpace.Platform.Windows.Rendering
             Enabled = true;
 
             game.GameSystems.Add(this);
+        }
+
+        public override void Initialize()
+        {
+            base.Initialize();
+
+            _cameraService = Services.GetService<ICameraProvider>();
+
             if (Screen.ScreenRendererDX11.IsSupported)
             {
                 Game.GameSystems.Add(new Screen.ScreenRendererDX11(Game, null));
@@ -30,13 +38,6 @@ namespace VirtualSpace.Platform.Windows.Rendering
             {
                 Game.GameSystems.Add(new Screen.ScreenRendererGdi(Game, null));
             }
-        }
-
-        public override void Initialize()
-        {
-            base.Initialize();
-
-            _cameraService = Services.GetService<ICameraProvider>();
         }
 
         protected override void LoadContent()

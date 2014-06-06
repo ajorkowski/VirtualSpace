@@ -237,7 +237,7 @@ namespace VirtualSpace.Platform.Windows.Rendering.Screen
                         BindFlags = BindFlags.ShaderResource,
                         CpuAccessFlags = CpuAccessFlags.None,
                         OptionFlags = ResourceOptionFlags.None
-                    }, new DataBox[] { new DataBox(pointerBuffer, pointerShapeInfo.Pitch, 0) });
+                    }, new DataRectangle(pointerBuffer, pointerShapeInfo.Pitch));
 
                     pinnedBuffer.Free();
                 }

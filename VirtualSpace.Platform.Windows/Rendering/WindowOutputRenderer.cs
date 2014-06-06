@@ -53,9 +53,11 @@ namespace VirtualSpace.Platform.Windows.Rendering
         public IInput Input { get { return _keyboardProvider; } }
         public ICamera Camera { get { return _cameraProvider; } }
 
-        protected override void LoadContent()
+        protected override void Initialize()
         {
-            base.LoadContent();
+            base.Initialize();
+
+            _environment.Initialise();
         }
 
         protected override void Update(GameTime gameTime)

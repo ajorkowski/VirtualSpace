@@ -18,6 +18,8 @@ namespace VirtualSpace.Core
             VSync = true;
         }
 
+        public IScreen Desktop { get { return _desktop; } }
+
         public void Initialise()
         {
             _device.Camera.MoveTo(0, 0, 20);

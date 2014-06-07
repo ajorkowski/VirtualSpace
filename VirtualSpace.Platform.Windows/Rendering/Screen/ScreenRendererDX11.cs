@@ -2,7 +2,6 @@
 using SharpDX.Direct3D;
 using SharpDX.Direct3D11;
 using SharpDX.DXGI;
-using System;
 using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 using VirtualSpace.Core.Screen;
@@ -33,6 +32,10 @@ namespace VirtualSpace.Platform.Windows.Rendering.Screen
         private Rectangle[] _dirtyBuffer;
 
         private byte[] _pointerShapeBuffer;
+        private OutputDuplicatePointerShapeInformation _pointerBufferInfo;
+        private SharpDX.Direct3D11.Texture2D _mouseMoveTexture;
+        private SharpDX.Direct3D11.Texture2D _mouseMoveTexture2;
+        private OutputDuplicatePointerPosition _lastMousePos;
 
         private Texture2D _moveTexture;
 
@@ -127,6 +130,18 @@ namespace VirtualSpace.Platform.Windows.Rendering.Screen
                 _captureLoop = null;
             }
 
+            if(_mouseMoveTexture != null)
+            {
+                _mouseMoveTexture.Dispose();
+                _mouseMoveTexture = null;
+            }
+
+            if (_mouseMoveTexture2 != null)
+            {
+                _mouseMoveTexture2.Dispose();
+                _mouseMoveTexture2 = null;
+            }
+
             base.UnloadContent();
         }
 
@@ -157,6 +172,18 @@ namespace VirtualSpace.Platform.Windows.Rendering.Screen
                 _captureLoop = null;
             }
 
+            if (_mouseMoveTexture != null)
+            {
+                _mouseMoveTexture.Dispose();
+                _mouseMoveTexture = null;
+            }
+
+            if (_mouseMoveTexture2 != null)
+            {
+                _mouseMoveTexture2.Dispose();
+                _mouseMoveTexture2 = null;
+            }
+
             base.Dispose(disposeManagedResources);
         }
 
@@ -174,7 +201,7 @@ namespace VirtualSpace.Platform.Windows.Rendering.Screen
                 }
                 catch(SharpDXException e)
                 {
-                    if(e.ResultCode == Result.WaitTimeout)
+                    if (e.ResultCode == Result.WaitTimeout || e.ResultCode.Code == -2005270489)
                     {
                         continue;
                     }
@@ -216,33 +243,20 @@ namespace VirtualSpace.Platform.Windows.Rendering.Screen
                     _pointerShapeBuffer = new byte[frameInfo.PointerShapeBufferSize];
                 }
 
-                Texture2D pointerTexture = null;
-                if (frameInfo.PointerShapeBufferSize > 0 && frameInfo.PointerPosition.Visible)
+                if (frameInfo.PointerShapeBufferSize > 0)
                 {
                     int pointerSize;
-                    OutputDuplicatePointerShapeInformation pointerShapeInfo;
                     var pinnedBuffer = GCHandle.Alloc(_pointerShapeBuffer, GCHandleType.Pinned);
                     var pointerBuffer = pinnedBuffer.AddrOfPinnedObject();
-                    _outputDuplication.GetFramePointerShape(_pointerShapeBuffer.Length, pointerBuffer, out pointerSize, out pointerShapeInfo);
-
-                    pointerTexture = new Texture2D(_captureDevice, new Texture2DDescription
+                    _outputDuplication.GetFramePointerShape(frameInfo.PointerShapeBufferSize, pointerBuffer, out pointerSize, out _pointerBufferInfo);
+                    if(_pointerBufferInfo.Type == 1)
                     {
-                        Width = pointerShapeInfo.Width,
-                        Height = pointerShapeInfo.Height,
-                        MipLevels = 1,
-                        ArraySize = 1,
-                        Format = Format.B8G8R8A8_UNorm,
-                        SampleDescription = new SampleDescription(1, 0),
-                        Usage = ResourceUsage.Default,
-                        BindFlags = BindFlags.ShaderResource,
-                        CpuAccessFlags = CpuAccessFlags.None,
-                        OptionFlags = ResourceOptionFlags.None
-                    }, new DataRectangle(pointerBuffer, pointerShapeInfo.Pitch));
-
+                        _pointerBufferInfo.Height /= 2;
+                    }
                     pinnedBuffer.Free();
                 }
 
-                if (dirtyCount > 0 || moveCount > 0 || pointerTexture != null)
+                if (frameInfo.LastPresentTime != 0 || frameInfo.LastMouseUpdateTime != 0)
                 {
                     var result = _mutex.Acquire(0, 1000);
                     if (result != Result.WaitTimeout && result != Result.Ok)
@@ -254,7 +268,12 @@ namespace VirtualSpace.Platform.Windows.Rendering.Screen
 
                     if(result == Result.Ok)
                     {
-                        var desc = _sharedTexture.Description;
+                        if (_mouseMoveTexture != null && _lastMousePos.Visible)
+                        {
+                            // We are moving the mouse... copy the last frame back to where it belongs
+                            context.CopySubresourceRegion(_mouseMoveTexture, 0, null, _sharedTexture, 0, _lastMousePos.Position.X, _lastMousePos.Position.Y);
+                        }
+
                         if (moveCount > 0)
                         {
                             DoMoves(context, moveCount, _moveBuffer);
@@ -265,19 +284,78 @@ namespace VirtualSpace.Platform.Windows.Rendering.Screen
                             DoDirty(context, capturedTexture, dirtyCount, _dirtyBuffer);
                         }
 
-                        if(pointerTexture != null)
+                        // Get temp texture to store temp mouse buffers
+                        if (_mouseMoveTexture == null || _mouseMoveTexture.Description.Width < _pointerBufferInfo.Width || _mouseMoveTexture.Description.Height < _pointerBufferInfo.Height)
                         {
-                            context.CopySubresourceRegion(pointerTexture, 0, null, _sharedTexture, 0, frameInfo.PointerPosition.Position.X, frameInfo.PointerPosition.Position.Y);
+                            if(_mouseMoveTexture != null)
+                            {
+                                _mouseMoveTexture.Dispose();
+                                _mouseMoveTexture = null;
+                            }
+
+                            if (_mouseMoveTexture2 != null)
+                            {
+                                _mouseMoveTexture2.Dispose();
+                                _mouseMoveTexture2 = null;
+                            }
+
+                            _mouseMoveTexture = new Texture2D(_captureDevice, new Texture2DDescription
+                            {
+                                Width = _pointerBufferInfo.Width,
+                                Height = _pointerBufferInfo.Height,
+                                MipLevels = 1,
+                                ArraySize = 1,
+                                Format = Format.B8G8R8A8_UNorm,
+                                SampleDescription = new SampleDescription(1, 0),
+                                Usage = ResourceUsage.Default,
+                                BindFlags = BindFlags.None,
+                                CpuAccessFlags = CpuAccessFlags.None,
+                                OptionFlags = ResourceOptionFlags.None
+                            });
+
+                            _mouseMoveTexture2 = new Texture2D(_captureDevice, new Texture2DDescription
+                            {
+                                Width = _pointerBufferInfo.Width,
+                                Height = _pointerBufferInfo.Height,
+                                MipLevels = 1,
+                                ArraySize = 1,
+                                Format = Format.B8G8R8A8_UNorm,
+                                SampleDescription = new SampleDescription(1, 0),
+                                Usage = ResourceUsage.Staging,
+                                BindFlags = BindFlags.None,
+                                CpuAccessFlags = CpuAccessFlags.Write,
+                                OptionFlags = ResourceOptionFlags.None
+                            });
+                        }
+
+                        if (frameInfo.LastMouseUpdateTime != 0)
+                        {
+                            _lastMousePos = frameInfo.PointerPosition;
+                        }
+
+                        if (_lastMousePos.Visible)
+                        {
+                            var toReplace = new ResourceRegion
+                            {
+                                Left = _lastMousePos.Position.X,
+                                Top = _lastMousePos.Position.Y,
+                                Front = 0,
+                                Right = _lastMousePos.Position.X + _mouseMoveTexture.Description.Width,
+                                Bottom = _lastMousePos.Position.Y + _mouseMoveTexture.Description.Height,
+                                Back = 1
+                            };
+                            context.CopySubresourceRegion(_sharedTexture, 0, toReplace, _mouseMoveTexture, 0);
+                            context.CopyResource(_mouseMoveTexture, _mouseMoveTexture2);
+
+                            CopyMouseData(_mouseMoveTexture2, _pointerBufferInfo, _pointerShapeBuffer);
+
+                            context.CopySubresourceRegion(_mouseMoveTexture2, 0, null, _sharedTexture, 0, _lastMousePos.Position.X, _lastMousePos.Position.Y);
                         }
 
                         _mutex.Release(0);
                     }
                 }
 
-                if(pointerTexture != null)
-                {
-                    pointerTexture.Dispose();
-                }
                 capturedTexture.Dispose();
                 _outputDuplication.ReleaseFrame();
             }
@@ -325,6 +403,84 @@ namespace VirtualSpace.Platform.Windows.Rendering.Screen
                 region.Bottom = rect[i].Bottom;
 
                 context.CopySubresourceRegion(src, 0, region, _sharedTexture, 0, rect[i].Left, rect[i].Top);
+            }
+        }
+
+        // TODO: The maths on this could be better?
+        private static void CopyMouseData(Texture2D mouseMoveTexture, OutputDuplicatePointerShapeInformation pointerInfo, byte[] pointerBuffer)
+        {
+            // Copy mouse data into second mouse move texture...
+            using (var mouseSurface = mouseMoveTexture.QueryInterface<Surface>())
+            {
+                var rect = mouseSurface.Map(SharpDX.DXGI.MapFlags.Write);
+
+                for (var y = 0; y < pointerInfo.Height; y++)
+                {
+                    byte mask = 0x80;
+                    for (var x = 0; x < pointerInfo.Width; x++)
+                    {
+                        var innerBaseVal = y * rect.Pitch + x * 4;
+
+                        switch (pointerInfo.Type)
+                        {
+                            case 1:
+                                // Monochrome
+                                var maskAnd = (pointerBuffer[y * pointerInfo.Pitch + x / 8] & mask) == mask;
+                                var maskOR = (pointerBuffer[y * pointerInfo.Pitch + x / 8 + pointerInfo.Height * pointerInfo.Pitch] & mask) == mask;
+
+                                Marshal.WriteByte(rect.DataPointer, innerBaseVal, maskAnd && maskOR ? (byte)0 : Marshal.ReadByte(rect.DataPointer, innerBaseVal));
+                                Marshal.WriteByte(rect.DataPointer, innerBaseVal + 1, maskAnd && maskOR ? (byte)0 : Marshal.ReadByte(rect.DataPointer, innerBaseVal + 1));
+                                Marshal.WriteByte(rect.DataPointer, innerBaseVal + 2, maskAnd && maskOR ? (byte)0 : Marshal.ReadByte(rect.DataPointer, innerBaseVal + 2));
+
+                                if (mask == 0x01)
+                                {
+                                    mask = 0x80;
+                                }
+                                else
+                                {
+                                    mask = (byte)(mask >> 1);
+                                }
+
+                                break;
+                            case 2:
+                                // Colour
+                                var baseVal = y * pointerInfo.Pitch + x * 4;
+                                var alpha = pointerBuffer[baseVal + 3] + 1;
+                                if (alpha != 1)
+                                {
+                                    var invAlpha = 256 - alpha;
+                                    alpha = alpha + 1;
+
+                                    Marshal.WriteByte(rect.DataPointer, innerBaseVal, (byte)((alpha * pointerBuffer[baseVal] + invAlpha * Marshal.ReadByte(rect.DataPointer, innerBaseVal)) >> 8));
+                                    Marshal.WriteByte(rect.DataPointer, innerBaseVal + 1, (byte)((alpha * pointerBuffer[baseVal + 1] + invAlpha * Marshal.ReadByte(rect.DataPointer, innerBaseVal + 1)) >> 8));
+                                    Marshal.WriteByte(rect.DataPointer, innerBaseVal + 2, (byte)((alpha * pointerBuffer[baseVal + 2] + invAlpha * Marshal.ReadByte(rect.DataPointer, innerBaseVal + 2)) >> 8));
+                                }
+                                break;
+                            case 4:
+                                // Masked color
+                                var baseMasked = y * pointerInfo.Pitch + x * 4;
+                                var maskFlag = pointerBuffer[baseMasked + 3];
+                                if (maskFlag == 0)
+                                {
+                                    // Copy new color right in
+                                    Marshal.WriteByte(rect.DataPointer, innerBaseVal, pointerBuffer[baseMasked]);
+                                    Marshal.WriteByte(rect.DataPointer, innerBaseVal + 1, pointerBuffer[baseMasked + 1]);
+                                    Marshal.WriteByte(rect.DataPointer, innerBaseVal + 2, pointerBuffer[baseMasked + 2]);
+                                }
+                                else
+                                {
+                                    // XOR color in
+                                    Marshal.WriteByte(rect.DataPointer, innerBaseVal, (byte)(pointerBuffer[baseMasked] ^ Marshal.ReadByte(rect.DataPointer, innerBaseVal)));
+                                    Marshal.WriteByte(rect.DataPointer, innerBaseVal + 1, (byte)(pointerBuffer[baseMasked + 1] ^ Marshal.ReadByte(rect.DataPointer, innerBaseVal + 1)));
+                                    Marshal.WriteByte(rect.DataPointer, innerBaseVal + 2, (byte)(pointerBuffer[baseMasked + 2] ^ Marshal.ReadByte(rect.DataPointer, innerBaseVal + 2)));
+                                }
+
+                                break;
+                        }
+                    }
+                }
+
+                mouseSurface.Unmap();
             }
         }
     }

@@ -9,7 +9,7 @@ namespace VirtualSpace.Platform.Windows.Rendering.Screen
 {
     internal abstract class ScreenRenderer : GameSystem
     {
-        protected readonly IScreen Screen;
+        protected readonly IScreen _screen;
 
         private ICameraProvider _cameraService;
         private BasicEffect _basicEffect;
@@ -24,7 +24,7 @@ namespace VirtualSpace.Platform.Windows.Rendering.Screen
             Visible = true;
             Enabled = true;
 
-            Screen = screen;
+            _screen = screen;
         }
 
         public override void Initialize()
@@ -58,7 +58,7 @@ namespace VirtualSpace.Platform.Windows.Rendering.Screen
             //_plane = ToDisposeContent(GeometricPrimitive.Plane.New(GraphicsDevice, Width, Height));
             _plane = ToDisposeContent(CreateCurvedSurface(GraphicsDevice, Width, Width, Height, 100));
 
-            _planeTransform = Matrix.Scaling(6.7f / Width); // Make it 6.7m wide...
+            _planeTransform = Matrix.Scaling(_screen.ScreenSize / Width); // Make it 6.7m wide...
             _basicEffect.TextureView = _planeShaderView;
             _basicEffect.World = _planeTransform;
         }

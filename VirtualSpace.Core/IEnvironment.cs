@@ -5,7 +5,7 @@ namespace VirtualSpace.Core
 {
     public interface IEnvironment
     {
-        public IScreen Desktop { get; set; }
+        IScreen Desktop { get; }
 
         void Initialise();
         void Update(TimeSpan totalGameTime, TimeSpan elapsedGameTime, bool isRunningSlowly);

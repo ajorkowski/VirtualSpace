@@ -30,6 +30,7 @@ namespace VirtualSpace.Platform.Windows.Rendering
         {
             Visible = true;
             Enabled = true;
+            DrawOrder = int.MaxValue;
 
             game.GameSystems.Add(this);
         }
@@ -92,13 +93,13 @@ namespace VirtualSpace.Platform.Windows.Rendering
 
         public override void Draw(GameTime gameTime)
         {
+            base.Draw(gameTime);
+
             _spriteBatch.Begin();
 
             _spriteBatch.DrawString(_spriteFont, string.Format("fps: {0}, cpu: {1:0.00}%, mem: {2:0.00}mb", _fps, _cpu, _memory), new Vector2(10, 10), Color.White);
 
             _spriteBatch.End();
-
-            base.Draw(gameTime);
         }
     }
 }

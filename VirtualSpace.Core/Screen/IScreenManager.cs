@@ -1,11 +1,7 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-
-namespace VirtualSpace.Core.Screen
+﻿namespace VirtualSpace.Core.Screen
 {
     public interface IScreenManager
     {
+        IScreen CreateDesktopScreen();
     }
 }

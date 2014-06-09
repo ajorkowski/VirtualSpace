@@ -4,11 +4,11 @@
   <PropertyGroup>
     <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
     <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
-    <ProjectGuid>{071EAF85-1606-494F-8B0A-5A04638DEB68}</ProjectGuid>
+    <ProjectGuid>{D49C666B-3057-45A1-B197-4E9F96CCF835}</ProjectGuid>
     <OutputType>Library</OutputType>
     <AppDesignerFolder>Properties</AppDesignerFolder>
-    <RootNamespace>VirtualSpace.Core</RootNamespace>
-    <AssemblyName>VirtualSpace.Core</AssemblyName>
+    <RootNamespace>VirtualSpace.Rendering</RootNamespace>
+    <AssemblyName>VirtualSpace.Rendering</AssemblyName>
     <TargetFrameworkVersion>v4.0</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
     <TargetFrameworkProfile>Client</TargetFrameworkProfile>
@@ -37,17 +37,28 @@
     <Reference Include="System" />
     <Reference Include="System.Core" />
     <Reference Include="Microsoft.CSharp" />
+    <Reference Include="System.Drawing" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="Device\CameraMatrices.cs" />
-    <Compile Include="Device\ICamera.cs" />
-    <Compile Include="Device\IDevice.cs" />
-    <Compile Include="Environment.cs" />
-    <Compile Include="IEnvironment.cs" />
+    <Compile Include="Device.cs" />
+    <Compile Include="Camera.cs" />
+    <Compile Include="Disposable.cs" />
+    <Compile Include="OpenGL\DefaultShaders.cs" />
+    <Compile Include="OpenGL\GeometricShapes\Sprite.cs" />
+    <Compile Include="OpenGL\Shader.cs" />
+    <Compile Include="OpenGL\VertexFloatBuffer.cs" />
+    <Compile Include="OpenGL\VertexFormat.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
-    <Compile Include="Screen\IScreen.cs" />
-    <Compile Include="Screen\IScreenManager.cs" />
-    <Compile Include="Services\IFpsService.cs" />
+    <Compile Include="Renderers\FpsRenderer.cs" />
+    <Compile Include="Renderers\GameTime.cs" />
+    <Compile Include="Renderers\Renderer.cs" />
+    <Compile Include="Renderers\ScreenRenderer.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\VirtualSpace.Core\VirtualSpace.Core.csproj">
+      <Project>{071eaf85-1606-494f-8b0a-5a04638deb68}</Project>
+      <Name>VirtualSpace.Core</Name>
+    </ProjectReference>
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />

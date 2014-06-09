@@ -1,91 +1,82 @@
-﻿using SharpDX;
-using SharpDX.Direct3D11;
-using SharpDX.DXGI;
+﻿using OpenTK.Graphics.OpenGL4;
 using System;
 using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
 using VirtualSpace.Core.Screen;
 
-namespace VirtualSpace.Platform.Windows.Rendering.Screen
+namespace VirtualSpace.Platform.Windows
 {
-    internal sealed class ScreenRendererGdi : ScreenRenderer
+    internal sealed class ScreenCaptureGdi : IScreen
     {
-        private SharpDX.Direct3D11.Texture2D _gdiTexture;
-        private SharpDX.Direct3D11.Texture2D _sharedTexture;
-        private SharpDX.Direct3D11.Texture2D _renderTexture;
-
         private IntPtr _desktopDC;
+        private IntPtr _bitmapHandle;
+        private int[] _pboBufferHandles;
+        private IntPtr _pboBufferPointer;
+        private bool _currentBufferFirst;
+        private bool _hasData;
+
         private int _nScreenWidth;
         private int _nScreenHeight;
-
-        private SharpDX.Direct3D11.Device _captureDevice;
-        private KeyedMutex _mutex;
-        private KeyedMutex _renderMutex;
 
         private bool _isRunning;
         private Task _captureLoop;
 
-        public ScreenRendererGdi(SharpDX.Toolkit.Game game, IScreen screen)
-            : base(game, screen)
+        public ScreenCaptureGdi()
         {
             _desktopDC = IntPtr.Zero;
+            _bitmapHandle = IntPtr.Zero;
         }
 
-        protected override int Width { get { return _nScreenWidth; } }
-        protected override int Height { get { return _nScreenHeight; } }
-        protected override SharpDX.Direct3D11.Texture2D ScreenTexture { get { return _renderTexture; } }
+        public int Width { get { return _nScreenWidth; } }
+        public int Height { get { return _nScreenHeight; } }
 
-        protected override void LoadContent()
+        public float ScreenSize { get; set; }
+        public float CurveRadius { get; set; }
+
+        public void StartCapture()
         {
+            StopCapture();
+
             _nScreenWidth = GetSystemMetrics(SystemMetric.SM_CXSCREEN);
             _nScreenHeight = GetSystemMetrics(SystemMetric.SM_CYSCREEN);
 
-            // Base description
-            var sharedDesc = new Texture2DDescription
-            {
-                CpuAccessFlags = CpuAccessFlags.None,
-                BindFlags = BindFlags.ShaderResource | BindFlags.RenderTarget,
-                Format = SharpDX.DXGI.Format.B8G8R8A8_UNorm,
-                Height = _nScreenHeight,
-                Width = _nScreenWidth,
-                OptionFlags = ResourceOptionFlags.SharedKeyedmutex,
-                MipLevels = 1,
-                ArraySize = 1,
-                SampleDescription = new SampleDescription(1, 0),
-                Usage = ResourceUsage.Default
-            };
-
-            _renderTexture = ToDisposeContent(new SharpDX.Direct3D11.Texture2D(GraphicsDevice, sharedDesc));
-            _renderMutex = ToDisposeContent(_renderTexture.QueryInterface<KeyedMutex>());
-
-            _captureDevice = ToDisposeContent(new SharpDX.Direct3D11.Device(SharpDX.Direct3D.DriverType.Hardware));
-            using (var sharedResource = _renderTexture.QueryInterface<SharpDX.DXGI.Resource1>())
-            {
-                _sharedTexture = ToDisposeContent(_captureDevice.OpenSharedResource<Texture2D>(sharedResource.SharedHandle));
-            }
-            _mutex = ToDisposeContent(_sharedTexture.QueryInterface<KeyedMutex>());
-
-            // The shared Gdi textures
-            sharedDesc.OptionFlags = ResourceOptionFlags.GdiCompatible;
-            _gdiTexture = ToDisposeContent(new SharpDX.Direct3D11.Texture2D(_captureDevice, sharedDesc));
-
             _desktopDC = GetDC(IntPtr.Zero);
+            _bitmapHandle = CreateCompatibleBitmap(_desktopDC, _nScreenWidth, _nScreenHeight);
+            
+            // Create OpenGL PBO to transfer bytes to video memory asyncly
+            // We create two of them so we can switch to avoid any locks...
+            _pboBufferHandles = new int[2];
+            GL.GenBuffers(2, _pboBufferHandles);
+            GL.BindBuffer(BufferTarget.PixelUnpackBuffer, _pboBufferHandles[0]);
+            GL.BufferData(BufferTarget.PixelUnpackBuffer, new IntPtr(_nScreenWidth * _nScreenHeight * 4), IntPtr.Zero, BufferUsageHint.StreamDraw);
+
+            GL.BindBuffer(BufferTarget.PixelUnpackBuffer, _pboBufferHandles[1]);
+            GL.BufferData(BufferTarget.PixelUnpackBuffer, new IntPtr(_nScreenWidth * _nScreenHeight * 4), IntPtr.Zero, BufferUsageHint.StreamDraw);
+            GL.BindBuffer(BufferTarget.PixelUnpackBuffer, 0);
 
             _isRunning = true;
             _captureLoop = Task.Run(() => CaptureLoop());
-
-            base.LoadContent();
         }
 
-        protected override void UnloadContent()
+        public void StopCapture()
         {
-            base.UnloadContent();
-
             if (_desktopDC != IntPtr.Zero)
             {
                 ReleaseDC(IntPtr.Zero, _desktopDC);
                 _desktopDC = IntPtr.Zero;
+            }
+
+            if (_bitmapHandle != IntPtr.Zero)
+            {
+                DeleteObject(_bitmapHandle);
+                _bitmapHandle = IntPtr.Zero;
+            }
+
+            if(_pboBufferHandles != null)
+            {
+                GL.DeleteBuffers(2, _pboBufferHandles);
+                _pboBufferHandles = null;
             }
 
             _isRunning = false;
@@ -97,83 +88,62 @@ namespace VirtualSpace.Platform.Windows.Rendering.Screen
             }
         }
 
-        public override void Draw(SharpDX.Toolkit.GameTime gameTime)
+        public void CaptureFrame(int textureHandle)
         {
-            // We need to make sure the surface is free!
-            var result = _renderMutex.Acquire(0, 100);
-            if (result != Result.WaitTimeout && result != Result.Ok)
+            if(_pboBufferPointer == IntPtr.Zero)
             {
-                throw new SharpDXException(result);
-            }
+                // Finish writing to the existing texture and write to texture
+                GL.BindTexture(TextureTarget.Texture2D, textureHandle);
+                GL.BindBuffer(BufferTarget.PixelUnpackBuffer, _pboBufferHandles[_currentBufferFirst ? 0 : 1]);
+                GL.UnmapBuffer(BufferTarget.PixelUnpackBuffer);
+                GL.TexSubImage2D(TextureTarget.Texture2D, 0, 0, 0, _nScreenWidth, _nScreenHeight, PixelFormat.Bgra, PixelType.UnsignedByte, IntPtr.Zero);
 
-            if (result == Result.Ok)
-            {
-                base.Draw(gameTime);
+                // Start the next buffer pointer
+                GL.BindBuffer(BufferTarget.PixelUnpackBuffer, _pboBufferHandles[_currentBufferFirst ? 1 : 0]);
+                _pboBufferPointer = GL.MapBuffer(BufferTarget.PixelUnpackBuffer, BufferAccess.WriteOnly);
 
-                _renderMutex.Release(0);
+                // Finish
+                GL.BindBuffer(BufferTarget.PixelUnpackBuffer, 0);
+                GL.BindTexture(TextureTarget.Texture2D, 0);
+
+                _currentBufferFirst = !_currentBufferFirst;
             }
         }
 
         private void CaptureLoop()
         {
-            var context = _captureDevice.ImmediateContext;
             while (_isRunning)
             {
-                try
+                if (!_hasData)
                 {
-                    var surface = _gdiTexture.QueryInterface<Surface1>();
-                    var dest = surface.GetDC(false);
-
-                    BitBlt(dest, 0, 0, _nScreenWidth, _nScreenHeight, _desktopDC, 0, 0, TernaryRasterOperations.SRCCOPY | TernaryRasterOperations.CAPTUREBLT);
+                    BitBlt(_bitmapHandle, 0, 0, _nScreenWidth, _nScreenHeight, _desktopDC, 0, 0, TernaryRasterOperations.SRCCOPY | TernaryRasterOperations.CAPTUREBLT);
 
                     // Get mouse info
                     CURSORINFO pci;
                     pci.cbSize = Marshal.SizeOf(typeof(CURSORINFO));
                     GetCursorInfo(out pci);
 
-                    DrawIcon(dest, pci.ptScreenPos.x, pci.ptScreenPos.y, pci.hCursor);
+                    DrawIcon(_bitmapHandle, pci.ptScreenPos.x, pci.ptScreenPos.y, pci.hCursor);
 
-                    surface.ReleaseDC();
-                    surface.Dispose();
-
-                    var result = _mutex.Acquire(0, 1000);
-                    if (result != Result.WaitTimeout && result != Result.Ok)
-                    {
-                        throw new SharpDXException(result);
-                    }
-
-                    if (result == Result.Ok)
-                    {
-                        context.CopyResource(_gdiTexture, _sharedTexture);
-
-                        _mutex.Release(0);
-                    }
+                    _hasData = true;
                 }
-                catch (AccessViolationException)
+
+                if (_hasData && _pboBufferPointer != IntPtr.Zero)
                 {
-                    // Sometimes the bitblt is a little too fast...
-                    Thread.Sleep(100);
+                    GetBitmapBits(_bitmapHandle, 4 * _nScreenHeight * _nScreenWidth, _pboBufferPointer);
+                    _hasData = false;
+                    _pboBufferPointer = IntPtr.Zero;
+                }
+                else
+                {
+                    Thread.Sleep(16);
                 }
             }
         }
 
-        protected override void Dispose(bool disposeManagedResources)
+        public void Dispose()
         {
-            if (_desktopDC != IntPtr.Zero)
-            {
-                ReleaseDC(IntPtr.Zero, _desktopDC);
-                _desktopDC = IntPtr.Zero;
-            }
-
-            _isRunning = false;
-            if (_captureLoop != null)
-            {
-                _captureLoop.Wait();
-                _captureLoop.Dispose();
-                _captureLoop = null;
-            }
-
-            base.Dispose(disposeManagedResources);
+            StopCapture();
         }
 
         [DllImport("user32.dll", SetLastError = true)]
@@ -215,6 +185,16 @@ namespace VirtualSpace.Platform.Windows.Rendering.Screen
         [DllImport("gdi32.dll", EntryPoint = "BitBlt", SetLastError = true)]
         [return: MarshalAs(UnmanagedType.Bool)]
         private static extern bool BitBlt([In] IntPtr hdc, int nXDest, int nYDest, int nWidth, int nHeight, [In] IntPtr hdcSrc, int nXSrc, int nYSrc, TernaryRasterOperations dwRop);
+
+        [DllImport("gdi32.dll", EntryPoint = "CreateCompatibleBitmap")]
+        private static extern IntPtr CreateCompatibleBitmap([In] IntPtr hdc, int nWidth, int nHeight);
+
+        [DllImport("gdi32.dll", EntryPoint = "DeleteObject")]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        private static extern bool DeleteObject([In] IntPtr hObject);
+
+        [DllImport("gdi32.dll")]
+        private static extern int GetBitmapBits(IntPtr hbmp, int cbBuffer, IntPtr lpvBits);
 
         private enum SystemMetric
         {

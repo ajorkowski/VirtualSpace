@@ -5,11 +5,11 @@ using System.Runtime.InteropServices;
 // General Information about an assembly is controlled through the following 
 // set of attributes. Change these attribute values to modify the information
 // associated with an assembly.
-[assembly: AssemblyTitle("VirtualSpace.Core")]
+[assembly: AssemblyTitle("VirtualSpace.Rendering")]
 [assembly: AssemblyDescription("")]
 [assembly: AssemblyConfiguration("")]
 [assembly: AssemblyCompany("")]
-[assembly: AssemblyProduct("VirtualSpace.Core")]
+[assembly: AssemblyProduct("VirtualSpace.Rendering")]
 [assembly: AssemblyCopyright("Copyright ©  2014")]
 [assembly: AssemblyTrademark("")]
 [assembly: AssemblyCulture("")]
@@ -20,7 +20,7 @@ using System.Runtime.InteropServices;
 [assembly: ComVisible(false)]
 
 // The following GUID is for the ID of the typelib if this project is exposed to COM
-[assembly: Guid("42b15cd7-58c0-4aac-8ffd-07f3f178ab8a")]
+[assembly: Guid("e3b4cbb8-d462-4afb-8cec-5d59864bcbbe")]
 
 // Version information for an assembly consists of the following four values:
 //

@@ -11,7 +11,7 @@
     <AssemblyName>VirtualSpace.Window</AssemblyName>
     <TargetFrameworkVersion>v4.5</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
-    <NuGetPackageImportStamp>7096c83a</NuGetPackageImportStamp>
+    <NuGetPackageImportStamp>83711ba8</NuGetPackageImportStamp>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
     <PlatformTarget>AnyCPU</PlatformTarget>
@@ -36,11 +36,12 @@
     <StartupObject />
   </PropertyGroup>
   <ItemGroup>
+    <Reference Include="OpenTK">
+      <HintPath>..\packages\OpenTK.1.1.1589.5941\lib\NET40\OpenTK.dll</HintPath>
+    </Reference>
     <Reference Include="System" />
     <Reference Include="System.Core" />
     <Reference Include="Microsoft.CSharp" />
-    <Reference Include="System.Drawing" />
-    <Reference Include="System.Windows.Forms" />
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Program.cs" />
@@ -53,27 +54,19 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\VirtualSpace.Core\VirtualSpace.Core.csproj">
-      <Project>{ffe24297-c6fe-43f5-a9cc-56807405364d}</Project>
+      <Project>{071eaf85-1606-494f-8b0a-5a04638deb68}</Project>
       <Name>VirtualSpace.Core</Name>
     </ProjectReference>
     <ProjectReference Include="..\VirtualSpace.Platform.Windows\VirtualSpace.Platform.Windows.csproj">
       <Project>{2c7caed3-9c1d-482e-822d-7062ccc5e67b}</Project>
       <Name>VirtualSpace.Platform.Windows</Name>
     </ProjectReference>
-  </ItemGroup>
-  <ItemGroup>
-    <ToolkitFont Include="Content\Arial16.xml" />
+    <ProjectReference Include="..\VirtualSpace.Rendering\VirtualSpace.Rendering.csproj">
+      <Project>{d49c666b-3057-45a1-b197-4e9f96ccf835}</Project>
+      <Name>VirtualSpace.Rendering</Name>
+    </ProjectReference>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
-  <Import Project="..\packages\SharpDX.2.6.0\build\SharpDX.targets" Condition="Exists('..\packages\SharpDX.2.6.0\build\SharpDX.targets')" />
-  <Target Name="EnsureNuGetPackageBuildImports" BeforeTargets="PrepareForBuild">
-    <PropertyGroup>
-      <ErrorText>This project references NuGet package(s) that are missing on this computer. Enable NuGet Package Restore to download them.  For more information, see http://go.microsoft.com/fwlink/?LinkID=322105. The missing file is {0}.</ErrorText>
-    </PropertyGroup>
-    <Error Condition="!Exists('..\packages\SharpDX.2.6.0\build\SharpDX.targets')" Text="$([System.String]::Format('$(ErrorText)', '..\packages\SharpDX.2.6.0\build\SharpDX.targets'))" />
-    <Error Condition="!Exists('..\packages\SharpDX.Toolkit.2.6.0\build\SharpDX.Toolkit.targets')" Text="$([System.String]::Format('$(ErrorText)', '..\packages\SharpDX.Toolkit.2.6.0\build\SharpDX.Toolkit.targets'))" />
-  </Target>
-  <Import Project="..\packages\SharpDX.Toolkit.2.6.0\build\SharpDX.Toolkit.targets" Condition="Exists('..\packages\SharpDX.Toolkit.2.6.0\build\SharpDX.Toolkit.targets')" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
        Other similar extension points exist, see Microsoft.Common.targets.
   <Target Name="BeforeBuild">

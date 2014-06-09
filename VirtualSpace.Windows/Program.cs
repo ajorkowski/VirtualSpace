@@ -4,6 +4,7 @@ using System.Reflection;
 using TinyIoC;
 using VirtualSpace.Core;
 using VirtualSpace.Platform.Windows;
+using VirtualSpace.Rendering;
 
 namespace VirtualSpace.Window
 {
@@ -16,11 +17,12 @@ namespace VirtualSpace.Window
             TinyIoCContainer.Current.AutoRegister(new List<Assembly>()
             {
                 typeof(IEnvironment).Assembly,
-                typeof(Device).Assembly
+                typeof(Device).Assembly,
+                typeof(FpsService).Assembly
             }, true);
 
-            var windowsOutput = TinyIoCContainer.Current.Resolve<IDevice>();
-            windowsOutput.Run(TinyIoCContainer.Current.Resolve<IEnvironment>());
+            var environment = TinyIoCContainer.Current.Resolve<IEnvironment>();
+            environment.Run();
             TinyIoCContainer.Current.Dispose();
         }
     }

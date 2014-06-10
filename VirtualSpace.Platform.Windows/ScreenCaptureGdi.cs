@@ -11,9 +11,11 @@ namespace VirtualSpace.Platform.Windows
     {
         private IntPtr _desktopDC;
         private IntPtr _bitmapHandle;
+        private IntPtr _bitmapDC;
         private int[] _pboBufferHandles;
+        private int _currentBufferIndex;
+
         private IntPtr _pboBufferPointer;
-        private bool _currentBufferFirst;
         private bool _hasData;
 
         private int _nScreenWidth;
@@ -43,6 +45,8 @@ namespace VirtualSpace.Platform.Windows
 
             _desktopDC = GetDC(IntPtr.Zero);
             _bitmapHandle = CreateCompatibleBitmap(_desktopDC, _nScreenWidth, _nScreenHeight);
+            _bitmapDC = CreateCompatibleDC(_desktopDC);
+            SelectObject(_bitmapDC, _bitmapHandle);
             
             // Create OpenGL PBO to transfer bytes to video memory asyncly
             // We create two of them so we can switch to avoid any locks...
@@ -65,6 +69,12 @@ namespace VirtualSpace.Platform.Windows
             {
                 ReleaseDC(IntPtr.Zero, _desktopDC);
                 _desktopDC = IntPtr.Zero;
+            }
+
+            if (_bitmapDC != IntPtr.Zero)
+            {
+                DeleteObject(_bitmapDC);
+                _bitmapDC = IntPtr.Zero;
             }
 
             if (_bitmapHandle != IntPtr.Zero)
@@ -100,6 +110,7 @@ namespace VirtualSpace.Platform.Windows
 
                 // Start the next buffer pointer
                 GL.BindBuffer(BufferTarget.PixelUnpackBuffer, _pboBufferHandles[_currentBufferFirst ? 1 : 0]);
+                //GL.BufferData(BufferTarget.PixelUnpackBuffer, (IntPtr)(4 * _nScreenHeight * _nScreenWidth), IntPtr.Zero, BufferUsageHint.StreamDraw);
                 _pboBufferPointer = GL.MapBuffer(BufferTarget.PixelUnpackBuffer, BufferAccess.WriteOnly);
 
                 // Finish
@@ -116,28 +127,34 @@ namespace VirtualSpace.Platform.Windows
             {
                 if (!_hasData)
                 {
-                    BitBlt(_bitmapHandle, 0, 0, _nScreenWidth, _nScreenHeight, _desktopDC, 0, 0, TernaryRasterOperations.SRCCOPY | TernaryRasterOperations.CAPTUREBLT);
+                    BitBlt(_bitmapDC, 0, 0, _nScreenWidth, _nScreenHeight, _desktopDC, 0, 0, TernaryRasterOperations.SRCCOPY | TernaryRasterOperations.CAPTUREBLT);
 
                     // Get mouse info
                     CURSORINFO pci;
                     pci.cbSize = Marshal.SizeOf(typeof(CURSORINFO));
                     GetCursorInfo(out pci);
 
-                    DrawIcon(_bitmapHandle, pci.ptScreenPos.x, pci.ptScreenPos.y, pci.hCursor);
+                    DrawIcon(_bitmapDC, pci.ptScreenPos.x, pci.ptScreenPos.y, pci.hCursor);
 
                     _hasData = true;
                 }
 
                 if (_hasData && _pboBufferPointer != IntPtr.Zero)
                 {
-                    GetBitmapBits(_bitmapHandle, 4 * _nScreenHeight * _nScreenWidth, _pboBufferPointer);
+                    //byte[] data = new byte[4 * _nScreenHeight * _nScreenWidth];
+                    //GCHandle pinnedArray = GCHandle.Alloc(data, GCHandleType.Pinned);
+                    //IntPtr pointer = pinnedArray.AddrOfPinnedObject();
+
+                    GetBitmapBits(_bitmapHandle, 4 * _nScreenHeight * _nScreenWidth, _pboBufferPointer); //pointer);
+                    //pinnedArray.Free();
+
                     _hasData = false;
                     _pboBufferPointer = IntPtr.Zero;
                 }
-                else
-                {
-                    Thread.Sleep(16);
-                }
+                //else
+                //{
+                //    Thread.Sleep(16);
+                //}
             }
         }
 
@@ -192,6 +209,12 @@ namespace VirtualSpace.Platform.Windows
         [DllImport("gdi32.dll", EntryPoint = "DeleteObject")]
         [return: MarshalAs(UnmanagedType.Bool)]
         private static extern bool DeleteObject([In] IntPtr hObject);
+
+        [DllImport("gdi32.dll", EntryPoint = "CreateCompatibleDC", SetLastError = true)]
+        private static extern IntPtr CreateCompatibleDC([In] IntPtr hdc);
+
+        [DllImport("gdi32.dll", EntryPoint = "SelectObject", SetLastError = true)]
+        private static extern IntPtr SelectObject([In] IntPtr hdc, [In] IntPtr hgdiobj);
 
         [DllImport("gdi32.dll")]
         private static extern int GetBitmapBits(IntPtr hbmp, int cbBuffer, IntPtr lpvBits);

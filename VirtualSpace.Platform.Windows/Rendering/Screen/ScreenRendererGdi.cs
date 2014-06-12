@@ -5,7 +5,6 @@ using System;
 using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
-using VirtualSpace.Core.Screen;
 
 namespace VirtualSpace.Platform.Windows.Rendering.Screen
 {
@@ -26,14 +25,16 @@ namespace VirtualSpace.Platform.Windows.Rendering.Screen
         private bool _isRunning;
         private Task _captureLoop;
 
-        public ScreenRendererGdi(SharpDX.Toolkit.Game game, IScreen screen)
-            : base(game, screen)
+        public ScreenRendererGdi(SharpDX.Toolkit.Game game)
+            : base(game)
         {
             _desktopDC = IntPtr.Zero;
+
+            UpdateOrder = -1;
         }
 
-        protected override int Width { get { return _nScreenWidth; } }
-        protected override int Height { get { return _nScreenHeight; } }
+        public override int Width { get { return _nScreenWidth; } }
+        public override int Height { get { return _nScreenHeight; } }
         protected override SharpDX.Direct3D11.Texture2D ScreenTexture { get { return _renderTexture; } }
 
         protected override void LoadContent()
@@ -114,6 +115,14 @@ namespace VirtualSpace.Platform.Windows.Rendering.Screen
             }
         }
 
+        public override void EndDraw()
+        {
+            base.EndDraw();
+
+            // Try and wait till after flip buffers to allow bitblt
+            //_syncEvent.Set();
+        }
+
         private void CaptureLoop()
         {
             var context = _captureDevice.ImmediateContext;
@@ -145,7 +154,6 @@ namespace VirtualSpace.Platform.Windows.Rendering.Screen
                     if (result == Result.Ok)
                     {
                         context.CopyResource(_gdiTexture, _sharedTexture);
-
                         _mutex.Release(0);
                     }
                 }
@@ -159,20 +167,7 @@ namespace VirtualSpace.Platform.Windows.Rendering.Screen
 
         protected override void Dispose(bool disposeManagedResources)
         {
-            if (_desktopDC != IntPtr.Zero)
-            {
-                ReleaseDC(IntPtr.Zero, _desktopDC);
-                _desktopDC = IntPtr.Zero;
-            }
-
-            _isRunning = false;
-            if (_captureLoop != null)
-            {
-                _captureLoop.Wait();
-                _captureLoop.Dispose();
-                _captureLoop = null;
-            }
-
+            UnloadContent();
             base.Dispose(disposeManagedResources);
         }
 

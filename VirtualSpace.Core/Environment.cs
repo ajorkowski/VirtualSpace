@@ -1,6 +1,6 @@
 ﻿using System;
 using VirtualSpace.Core.Device;
-using VirtualSpace.Core.Screen;
+using VirtualSpace.Core.Renderer;
 
 namespace VirtualSpace.Core
 {
@@ -8,21 +8,22 @@ namespace VirtualSpace.Core
     {
         private readonly IDevice _device;
         private readonly IInput _input;
-        private readonly IScreen _desktop;
+        
+        private IRenderer _renderer;
 
         public Environment(IDevice device)
         {
             _device = device;
             _input = device.Input;
-            _desktop = new Screen.Screen { ScreenSize = 17.2f };
             VSync = true;
         }
 
-        public IScreen Desktop { get { return _desktop; } }
-
-        public void Initialise()
+        public void Initialise(IRenderer renderer)
         {
-            _device.Camera.MoveTo(0, 0, 20);
+            _renderer = renderer;
+            _renderer.Camera.MoveTo(0, 0, 20);
+            _renderer.ScreenManager.Desktop.ScreenSize = 17.2f;
+            _renderer.ScreenManager.Desktop.CurveRadius = 0;
         }
 
         public void Update(TimeSpan totalGameTime, TimeSpan elapsedGameTime, bool isRunningSlowly)
@@ -49,30 +50,58 @@ namespace VirtualSpace.Core
         {
             float z = 0;
             float x = 0;
+            float velocity = .002f * (float)elapsedGameTime.TotalMilliseconds;
 
             if (_input.IsDown(Keys.W))
             {
-                z -= .002f * (float)elapsedGameTime.TotalMilliseconds;
+                z -= velocity;
             }
 
             if (_input.IsDown(Keys.S))
             {
-                z += .002f * (float)elapsedGameTime.TotalMilliseconds;
+                z += velocity;
             }
 
             if (_input.IsDown(Keys.A))
             {
-                x += .002f * (float)elapsedGameTime.TotalMilliseconds;
+                x += velocity;
             }
 
             if (_input.IsDown(Keys.D))
             {
-                x -= .002f * (float)elapsedGameTime.TotalMilliseconds;
+                x -= velocity;
             }
 
             if (z != 0 || x != 0)
             {
-                _device.Camera.MoveRelative(x, 0, z);
+                _renderer.Camera.MoveRelative(x, 0, z);
+            }
+
+            float xRot = 0;
+            float yRot = 0;
+            if (_input.IsDown(Keys.Up))
+            {
+                xRot -= velocity;
+            }
+
+            if (_input.IsDown(Keys.Down))
+            {
+                xRot += velocity;
+            }
+
+            if (_input.IsDown(Keys.Left))
+            {
+                yRot -= velocity;
+            }
+
+            if (_input.IsDown(Keys.Right))
+            {
+                yRot += velocity;
+            }
+
+            if (xRot != 0 || yRot != 0)
+            {
+                _renderer.Camera.RotateRelative(xRot, yRot, 0);
             }
         }
     }

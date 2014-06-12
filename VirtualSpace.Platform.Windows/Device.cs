@@ -24,6 +24,5 @@ namespace VirtualSpace.Platform.Windows
         }
 
         public IInput Input { get { return _renderer.Input; } }
-        public ICamera Camera { get { return _renderer.Camera; } }
     }
 }

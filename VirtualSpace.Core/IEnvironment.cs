@@ -1,13 +1,11 @@
 ﻿using System;
-using VirtualSpace.Core.Screen;
+using VirtualSpace.Core.Renderer;
 
 namespace VirtualSpace.Core
 {
     public interface IEnvironment
     {
-        IScreen Desktop { get; }
-
-        void Initialise();
+        void Initialise(IRenderer renderer);
         void Update(TimeSpan totalGameTime, TimeSpan elapsedGameTime, bool isRunningSlowly);
 
         bool VSync { get; }

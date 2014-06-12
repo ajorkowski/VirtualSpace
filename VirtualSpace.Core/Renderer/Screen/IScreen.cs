@@ -1,7 +1,10 @@
-﻿namespace VirtualSpace.Core.Screen
+﻿namespace VirtualSpace.Core.Renderer.Screen
 {
     public interface IScreen
     {
+        int Width { get; }
+        int Height { get; }
+
         /// <summary>
         /// Diagonal size of screen
         /// </summary>

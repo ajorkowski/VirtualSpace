@@ -31,15 +31,6 @@ namespace VirtualSpace.Platform.Windows.Rendering
 
             _cameraService = Services.GetService<ICameraProvider>();
             var environment = Services.GetService<IEnvironment>();
-
-            if (Screen.ScreenRendererDX11.IsSupported)
-            {
-                Game.GameSystems.Add(new Screen.ScreenRendererDX11(Game, environment.Desktop));
-            }
-            else
-            {
-                Game.GameSystems.Add(new Screen.ScreenRendererGdi(Game, environment.Desktop));
-            }
         }
 
         protected override void LoadContent()

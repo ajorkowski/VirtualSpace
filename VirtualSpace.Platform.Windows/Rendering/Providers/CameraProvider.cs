@@ -1,6 +1,6 @@
 ﻿using SharpDX;
 using SharpDX.Toolkit;
-using VirtualSpace.Core.Device;
+using VirtualSpace.Core.Renderer;
 
 namespace VirtualSpace.Platform.Windows.Rendering.Providers
 {
@@ -31,6 +31,24 @@ namespace VirtualSpace.Platform.Windows.Rendering.Providers
         public void MoveRelative(float x, float y, float z)
         {
             _view = _view * Matrix.Translation(x, y, -z);
+        }
+
+        public void RotateRelative(float x, float y, float z)
+        {
+            if (x != 0)
+            {
+                _view = _view * Matrix.RotationX(x);
+            }
+
+            if (y != 0)
+            {
+                _view = _view * Matrix.RotationY(y);
+            }
+
+            if (z != 0)
+            {
+                _view = _view * Matrix.RotationZ(z);
+            }
         }
 
         public void MoveAbsolute(float x, float y, float z)

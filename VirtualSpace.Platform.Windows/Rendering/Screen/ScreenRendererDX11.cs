@@ -4,7 +4,6 @@ using SharpDX.Direct3D11;
 using SharpDX.DXGI;
 using System.Runtime.InteropServices;
 using System.Threading.Tasks;
-using VirtualSpace.Core.Screen;
 
 namespace VirtualSpace.Platform.Windows.Rendering.Screen
 {
@@ -68,13 +67,13 @@ namespace VirtualSpace.Platform.Windows.Rendering.Screen
             }
         }
 
-        public ScreenRendererDX11(SharpDX.Toolkit.Game game, IScreen screen)
-            : base(game, screen)
+        public ScreenRendererDX11(SharpDX.Toolkit.Game game)
+            : base(game)
         {
         }
 
-        protected override int Width { get { return _nScreenWidth; } }
-        protected override int Height { get { return _nScreenHeight; } }
+        public override int Width { get { return _nScreenWidth; } }
+        public override int Height { get { return _nScreenHeight; } }
         protected override SharpDX.Direct3D11.Texture2D ScreenTexture { get { return _renderTexture; } }
 
         protected override void LoadContent()

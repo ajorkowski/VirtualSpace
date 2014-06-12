@@ -34,11 +34,10 @@
       <SpecificVersion>False</SpecificVersion>
       <HintPath>..\packages\SharpDX.2.6.0\Bin\DirectX11_2-net40\SharpDX.dll</HintPath>
     </Reference>
-    <Reference Include="SharpDX.D3DCompiler, Version=2.6.0.0, Culture=neutral, PublicKeyToken=b4dcf0f35e5521f1, processorArchitecture=MSIL">
-      <SpecificVersion>False</SpecificVersion>
+    <Reference Include="SharpDX.D3DCompiler">
       <HintPath>..\packages\SharpDX.2.6.0\Bin\DirectX11_2-net40\SharpDX.D3DCompiler.dll</HintPath>
     </Reference>
-    <Reference Include="SharpDX.Direct2D1, Version=2.6.0.0, Culture=neutral, PublicKeyToken=b4dcf0f35e5521f1, processorArchitecture=MSIL">
+    <Reference Include="SharpDX.Direct2D1, Version=2.6.0.0, Culture=neutral, processorArchitecture=MSIL">
       <SpecificVersion>False</SpecificVersion>
       <HintPath>..\packages\SharpDX.2.6.0\Bin\DirectX11_2-net40\SharpDX.Direct2D1.dll</HintPath>
     </Reference>
@@ -58,8 +57,7 @@
       <SpecificVersion>False</SpecificVersion>
       <HintPath>..\packages\SharpDX.2.6.0\Bin\DirectX11_2-net40\SharpDX.Toolkit.dll</HintPath>
     </Reference>
-    <Reference Include="SharpDX.Toolkit.Compiler, Version=2.6.0.0, Culture=neutral, PublicKeyToken=b4dcf0f35e5521f1, processorArchitecture=MSIL">
-      <SpecificVersion>False</SpecificVersion>
+    <Reference Include="SharpDX.Toolkit.Compiler">
       <HintPath>..\packages\SharpDX.2.6.0\Bin\DirectX11_2-net40\SharpDX.Toolkit.Compiler.dll</HintPath>
     </Reference>
     <Reference Include="SharpDX.Toolkit.Game, Version=2.6.0.0, Culture=neutral, PublicKeyToken=b4dcf0f35e5521f1, processorArchitecture=MSIL">
@@ -82,6 +80,7 @@
   <ItemGroup>
     <Compile Include="Device.cs" />
     <Compile Include="Rendering\Providers\KeyboardProvider.cs" />
+    <Compile Include="Rendering\Screen\ScreenManager.cs" />
     <Compile Include="Rendering\Screen\ScreenRendererDX11.cs" />
     <Compile Include="Rendering\Screen\ScreenRendererGdi.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />

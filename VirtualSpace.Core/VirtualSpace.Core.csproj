@@ -38,17 +38,17 @@
     <WarningLevel>4</WarningLevel>
   </PropertyGroup>
   <ItemGroup>
-    <Compile Include="Device\ICamera.cs" />
+    <Compile Include="Renderer\ICamera.cs" />
     <Compile Include="Environment.cs" />
-    <Compile Include="Screen\IScreen.cs" />
-    <Compile Include="Screen\IScreenManager.cs" />
+    <Compile Include="Renderer\IRenderer.cs" />
+    <Compile Include="Renderer\Screen\IScreen.cs" />
+    <Compile Include="Renderer\Screen\IScreenManager.cs" />
     <Compile Include="IEnvironment.cs" />
     <Compile Include="Device\IInput.cs" />
     <Compile Include="Device\Keys.cs" />
     <Compile Include="Device\ButtonState.cs" />
     <Compile Include="IDevice.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
-    <Compile Include="Screen\Screen.cs" />
   </ItemGroup>
   <ItemGroup />
   <Import Project="$(MSBuildExtensionsPath32)\Microsoft\Portable\$(TargetFrameworkVersion)\Microsoft.Portable.CSharp.targets" />

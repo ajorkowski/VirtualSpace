@@ -3,15 +3,19 @@ using SharpDX.Toolkit;
 using SharpDX.Toolkit.Graphics;
 using VirtualSpace.Core;
 using VirtualSpace.Core.Device;
+using VirtualSpace.Core.Renderer;
+using VirtualSpace.Core.Renderer.Screen;
 using VirtualSpace.Platform.Windows.Rendering.Providers;
+using VirtualSpace.Platform.Windows.Rendering.Screen;
 
 namespace VirtualSpace.Platform.Windows.Rendering
 {
-    public sealed class WindowOutputRenderer : Game
+    public sealed class WindowOutputRenderer : Game, IDevice, IRenderer
     {
         private readonly GraphicsDeviceManager _device;
 
         private readonly SceneRenderer _sceneRenderer;
+        private readonly ScreenManager _screenManager;
         private readonly CameraProvider _cameraProvider;
         private readonly FpsRenderer _fpsRenderer;
         private readonly KeyboardProvider _keyboardProvider;
@@ -37,6 +41,7 @@ namespace VirtualSpace.Platform.Windows.Rendering
             _keyboardProvider = ToDispose(new KeyboardProvider(this));
             _cameraProvider = ToDispose(new CameraProvider(this));
             _sceneRenderer = ToDispose(new SceneRenderer(this));
+            _screenManager = ToDispose(new ScreenManager(this));
             _fpsRenderer = ToDispose(new FpsRenderer(this));
 
             Content.RootDirectory = "Content";
@@ -52,12 +57,13 @@ namespace VirtualSpace.Platform.Windows.Rendering
 
         public IInput Input { get { return _keyboardProvider; } }
         public ICamera Camera { get { return _cameraProvider; } }
+        public IScreenManager ScreenManager { get { return _screenManager; } }
 
         protected override void Initialize()
         {
             base.Initialize();
 
-            _environment.Initialise();
+            _environment.Initialise(this);
         }
 
         protected override void Update(GameTime gameTime)

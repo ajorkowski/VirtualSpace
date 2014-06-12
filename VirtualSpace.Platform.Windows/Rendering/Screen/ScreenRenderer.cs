@@ -2,15 +2,13 @@
 using SharpDX.Toolkit;
 using SharpDX.Toolkit.Graphics;
 using System;
-using VirtualSpace.Core.Screen;
+using VirtualSpace.Core.Renderer.Screen;
 using VirtualSpace.Platform.Windows.Rendering.Providers;
 
 namespace VirtualSpace.Platform.Windows.Rendering.Screen
 {
-    internal abstract class ScreenRenderer : GameSystem
+    internal abstract class ScreenRenderer : GameSystem, IScreen
     {
-        protected readonly IScreen _screen;
-
         private ICameraProvider _cameraService;
         private BasicEffect _basicEffect;
 
@@ -18,13 +16,12 @@ namespace VirtualSpace.Platform.Windows.Rendering.Screen
         private SharpDX.Direct3D11.ShaderResourceView _planeShaderView;
         private Matrix _planeTransform;
 
-        public ScreenRenderer(Game game, IScreen screen)
+        public ScreenRenderer(Game game)
             : base(game)
         {
             Visible = true;
             Enabled = true;
-
-            _screen = screen;
+            ScreenSize = 1;
         }
 
         public override void Initialize()
@@ -55,10 +52,16 @@ namespace VirtualSpace.Platform.Windows.Rendering.Screen
                 Texture2D = new SharpDX.Direct3D11.ShaderResourceViewDescription.Texture2DResource { MipLevels = desc.MipLevels, MostDetailedMip = desc.MipLevels - 1 }
             }));
 
-            //_plane = ToDisposeContent(GeometricPrimitive.Plane.New(GraphicsDevice, Width, Height));
-            _plane = ToDisposeContent(CreateCurvedSurface(GraphicsDevice, Width, Width, Height, 100));
+            if (CurveRadius <= 0.01 || CurveRadius > 100000)
+            {
+                _plane = ToDisposeContent(GeometricPrimitive.Plane.New(GraphicsDevice, Width, Height));
+            }
+            else
+            {
+                _plane = ToDisposeContent(CreateCurvedSurface(GraphicsDevice, CurveRadius * Width / ScreenSize, Width, Height, 100));
+            }
 
-            _planeTransform = Matrix.Scaling(_screen.ScreenSize / Width); // Make it 6.7m wide...
+            _planeTransform = Matrix.Scaling(ScreenSize / Width); // Make it 6.7m wide...
             _basicEffect.TextureView = _planeShaderView;
             _basicEffect.World = _planeTransform;
         }
@@ -78,8 +81,10 @@ namespace VirtualSpace.Platform.Windows.Rendering.Screen
             _plane.Draw(_basicEffect);
         }
 
-        protected abstract int Width { get; }
-        protected abstract int Height { get; }
+        public abstract int Width { get; }
+        public abstract int Height { get; }
+        public float ScreenSize { get; set; }
+        public float CurveRadius { get; set; }
         protected abstract SharpDX.Direct3D11.Texture2D ScreenTexture { get; }
 
         private static GeometricPrimitive CreateCurvedSurface(GraphicsDevice device, float distance, float width, float height, int tessellation)

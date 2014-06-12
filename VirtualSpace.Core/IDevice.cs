@@ -8,6 +8,5 @@ namespace VirtualSpace.Core
         void Run(IEnvironment environment);
 
         IInput Input { get; }
-        ICamera Camera { get; }
     }
 }

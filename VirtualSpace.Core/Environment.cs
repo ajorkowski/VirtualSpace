@@ -6,20 +6,17 @@ namespace VirtualSpace.Core
 {
     public class Environment : IEnvironment
     {
-        private readonly IDevice _device;
-        private readonly IInput _input;
-        
+        private IInput _input;
         private IRenderer _renderer;
 
-        public Environment(IDevice device)
+        public Environment()
         {
-            _device = device;
-            _input = device.Input;
             VSync = true;
         }
 
-        public void Initialise(IRenderer renderer)
+        public void Initialise(IRenderer renderer, IInput input)
         {
+            _input = input;
             _renderer = renderer;
             _renderer.Camera.MoveTo(0, 0, 20);
             _renderer.ScreenManager.Desktop.ScreenSize = 17.2f;

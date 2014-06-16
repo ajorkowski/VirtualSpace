@@ -1,7 +1,11 @@
 ﻿using SharpDX;
 using SharpDX.Toolkit;
 using SharpDX.Toolkit.Graphics;
+using SharpDX.Windows;
+using System.Threading;
+using System.Windows.Forms;
 using VirtualSpace.Core;
+using VirtualSpace.Core.AppContext;
 using VirtualSpace.Core.Device;
 using VirtualSpace.Core.Renderer;
 using VirtualSpace.Core.Renderer.Screen;
@@ -10,9 +14,10 @@ using VirtualSpace.Platform.Windows.Rendering.Screen;
 
 namespace VirtualSpace.Platform.Windows.Rendering
 {
-    public sealed class WindowOutputRenderer : Game, IDevice, IRenderer
+    internal sealed class WindowOutputRenderer : Game, IRenderer
     {
         private readonly GraphicsDeviceManager _device;
+        private readonly GameContext _context;
 
         private readonly SceneRenderer _sceneRenderer;
         private readonly ScreenManager _screenManager;
@@ -20,11 +25,17 @@ namespace VirtualSpace.Platform.Windows.Rendering
         private readonly FpsRenderer _fpsRenderer;
         private readonly KeyboardProvider _keyboardProvider;
 
+        private CancellationToken _runToken;
+
         private IEnvironment _environment;
         private bool _currentVSync;
 
-        public WindowOutputRenderer()
+        public WindowOutputRenderer(IApplicationContext context)
         {
+            var window = new RenderForm("Virtual Space");
+            window.Owner = context.NativeHandle as Form;
+            _context = new GameContext(window, 800, 600);
+
 #if DEBUG
             SharpDX.Configuration.EnableObjectTracking = true;
 #endif
@@ -47,12 +58,14 @@ namespace VirtualSpace.Platform.Windows.Rendering
             Content.RootDirectory = "Content";
         }
 
-        public void Run(IEnvironment environment)
+        public void Run(IEnvironment environment, CancellationToken token)
         {
             _environment = environment;
             Services.AddService(environment);
 
-            base.Run();
+            _runToken = token;
+
+            base.Run(_context);
         }
 
         public IInput Input { get { return _keyboardProvider; } }
@@ -63,11 +76,17 @@ namespace VirtualSpace.Platform.Windows.Rendering
         {
             base.Initialize();
 
-            _environment.Initialise(this);
+            _environment.Initialise(this, Input);
         }
 
         protected override void Update(GameTime gameTime)
         {
+            if (_runToken.IsCancellationRequested)
+            {
+                Exit();
+                return;
+            }
+
             _environment.Update(gameTime.TotalGameTime, gameTime.ElapsedGameTime, gameTime.IsRunningSlowly);
 
             if (_environment.VSync != _currentVSync)

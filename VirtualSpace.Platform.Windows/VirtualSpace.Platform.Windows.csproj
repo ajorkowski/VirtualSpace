@@ -78,7 +78,9 @@
     <Reference Include="System.Windows.Forms" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="Device.cs" />
+    <Compile Include="ApplicationContext.cs" />
+    <Compile Include="Device\DeviceManager.cs" />
+    <Compile Include="Device\WindowedDevice.cs" />
     <Compile Include="Rendering\Providers\KeyboardProvider.cs" />
     <Compile Include="Rendering\Screen\ScreenManager.cs" />
     <Compile Include="Rendering\Screen\ScreenRendererDX11.cs" />

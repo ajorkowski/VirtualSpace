@@ -6,9 +6,9 @@ using VirtualSpace.Platform.Windows.Rendering.Providers;
 
 namespace VirtualSpace.Platform.Windows.Rendering
 {
-    internal sealed class SceneRenderer : GameSystem
+    internal sealed class SceneRenderer : SubGameSystem
     {
-        private ICameraProvider _cameraService;
+        private readonly ICameraProvider _cameraService;
 
         private GeometricPrimitive _cube;
         private Vector3 _cubeLighting;
@@ -16,20 +16,19 @@ namespace VirtualSpace.Platform.Windows.Rendering
 
         private BasicEffect _basicEffect;
 
-        public SceneRenderer(Game game)
+        public SceneRenderer(GameSystem game, ICameraProvider camera)
             : base(game)
         {
             Visible = true;
             Enabled = true;
 
-            game.GameSystems.Add(this);
+            _cameraService = camera;
         }
 
         public override void Initialize()
         {
             base.Initialize();
 
-            _cameraService = Services.GetService<ICameraProvider>();
             var environment = Services.GetService<IEnvironment>();
         }
 

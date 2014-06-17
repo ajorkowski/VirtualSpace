@@ -4,6 +4,7 @@ using SharpDX.Direct3D11;
 using SharpDX.DXGI;
 using System.Runtime.InteropServices;
 using System.Threading.Tasks;
+using VirtualSpace.Platform.Windows.Rendering.Providers;
 
 namespace VirtualSpace.Platform.Windows.Rendering.Screen
 {
@@ -67,8 +68,8 @@ namespace VirtualSpace.Platform.Windows.Rendering.Screen
             }
         }
 
-        public ScreenRendererDX11(SharpDX.Toolkit.Game game)
-            : base(game)
+        public ScreenRendererDX11(SharpDX.Toolkit.GameSystem game, ICameraProvider camera)
+            : base(game, camera)
         {
         }
 

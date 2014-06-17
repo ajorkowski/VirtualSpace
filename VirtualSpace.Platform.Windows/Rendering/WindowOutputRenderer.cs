@@ -2,10 +2,8 @@
 using SharpDX.Toolkit;
 using SharpDX.Toolkit.Graphics;
 using SharpDX.Windows;
-using System.Threading;
 using System.Windows.Forms;
 using VirtualSpace.Core;
-using VirtualSpace.Core.AppContext;
 using VirtualSpace.Core.Device;
 using VirtualSpace.Core.Renderer;
 using VirtualSpace.Core.Renderer.Screen;
@@ -14,97 +12,96 @@ using VirtualSpace.Platform.Windows.Rendering.Screen;
 
 namespace VirtualSpace.Platform.Windows.Rendering
 {
-    internal sealed class WindowOutputRenderer : Game, IRenderer
+    internal sealed class WindowOutputRenderer : GameWindowRenderer, IRenderer
     {
-        private readonly GraphicsDeviceManager _device;
-        private readonly GameContext _context;
+        private readonly IInput _input;
 
-        private readonly SceneRenderer _sceneRenderer;
-        private readonly ScreenManager _screenManager;
-        private readonly CameraProvider _cameraProvider;
-        private readonly FpsRenderer _fpsRenderer;
-        private readonly KeyboardProvider _keyboardProvider;
-
-        private CancellationToken _runToken;
-
+        private CameraProvider _cameraProvider;
+        private ScreenManager _screenManager;
+        private FpsRenderer _fpsRenderer;
+        private SceneRenderer _sceneRenderer;
         private IEnvironment _environment;
+
         private bool _currentVSync;
 
-        public WindowOutputRenderer(IApplicationContext context)
+        public WindowOutputRenderer(Game game, IInput input)
+            : base(game, NewWindow())
         {
-            var window = new RenderForm("Virtual Space");
-            window.Owner = context.NativeHandle as Form;
-            _context = new GameContext(window, 800, 600);
+            Enabled = true;
+            Visible = true;
 
-#if DEBUG
-            SharpDX.Configuration.EnableObjectTracking = true;
-#endif
-
-            _device = ToDispose(new GraphicsDeviceManager(this));
-            _currentVSync = _device.SynchronizeWithVerticalRetrace;
-
-#if DEBUG
-            _device.DeviceCreationFlags = SharpDX.Direct3D11.DeviceCreationFlags.Debug;
-#endif
-
-            IsMouseVisible = true;
-
-            _keyboardProvider = ToDispose(new KeyboardProvider(this));
-            _cameraProvider = ToDispose(new CameraProvider(this));
-            _sceneRenderer = ToDispose(new SceneRenderer(this));
-            _screenManager = ToDispose(new ScreenManager(this));
-            _fpsRenderer = ToDispose(new FpsRenderer(this));
-
-            Content.RootDirectory = "Content";
+            _input = input;
+            
+            game.GameSystems.Add(this);
         }
 
-        public void Run(IEnvironment environment, CancellationToken token)
-        {
-            _environment = environment;
-            Services.AddService(environment);
-
-            _runToken = token;
-
-            base.Run(_context);
-        }
-
-        public IInput Input { get { return _keyboardProvider; } }
+        public IInput Input { get { return _input; } }
         public ICamera Camera { get { return _cameraProvider; } }
         public IScreenManager ScreenManager { get { return _screenManager; } }
 
-        protected override void Initialize()
+        public override void Initialize()
         {
             base.Initialize();
 
-            _environment.Initialise(this, Input);
+            _cameraProvider = ToDispose(new CameraProvider(this));
+            _screenManager = ToDispose(new ScreenManager(this, _cameraProvider));
+            _fpsRenderer = ToDispose(new FpsRenderer(this));
+            _sceneRenderer = ToDispose(new SceneRenderer(this, _cameraProvider));
+
+            _environment = Services.GetService<IEnvironment>();
+            _environment.Initialise(this, _input);
+
+            _currentVSync = GraphicsDevice.Presenter.PresentInterval != PresentInterval.Immediate;
         }
 
-        protected override void Update(GameTime gameTime)
+        protected override void LoadContent()
         {
-            if (_runToken.IsCancellationRequested)
-            {
-                Exit();
-                return;
-            }
+            ((RenderForm)Window.NativeWindow).Show();
 
-            _environment.Update(gameTime.TotalGameTime, gameTime.ElapsedGameTime, gameTime.IsRunningSlowly);
+            base.LoadContent();
+        }
+
+        protected override void UnloadContent()
+        {
+            ((RenderForm)Window.NativeWindow).Close();
+
+            base.UnloadContent();
+        }
+
+        public override void Update(GameTime gameTime)
+        {
+            _environment.Update(this, gameTime.TotalGameTime, gameTime.ElapsedGameTime, gameTime.IsRunningSlowly);
 
             if (_environment.VSync != _currentVSync)
             {
                 GraphicsDevice.Presenter.PresentInterval = _environment.VSync ? PresentInterval.One : PresentInterval.Immediate;
                 _currentVSync = _environment.VSync;
             }
+
             _fpsRenderer.Enabled = _environment.ShowFPS;
             _fpsRenderer.Visible = _environment.ShowFPS;
 
             base.Update(gameTime);
         }
 
-        protected override void Draw(GameTime gameTime)
+        public override void Draw(GameTime gameTime)
         {
             GraphicsDevice.Clear(Color.CornflowerBlue);
 
             base.Draw(gameTime);
+        }
+
+        protected override void Dispose(bool disposeManagedResources)
+        {
+            Game.GameSystems.Remove(this);
+
+            base.Dispose(disposeManagedResources);
+        }
+
+        private static GameContext NewWindow()
+        {
+            var window = new RenderForm("Virtual Space");
+            return new GameContext(window, 800, 600);
         }
     }
 }

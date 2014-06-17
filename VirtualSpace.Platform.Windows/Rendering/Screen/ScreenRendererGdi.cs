@@ -5,6 +5,7 @@ using System;
 using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
+using VirtualSpace.Platform.Windows.Rendering.Providers;
 
 namespace VirtualSpace.Platform.Windows.Rendering.Screen
 {
@@ -25,8 +26,8 @@ namespace VirtualSpace.Platform.Windows.Rendering.Screen
         private bool _isRunning;
         private Task _captureLoop;
 
-        public ScreenRendererGdi(SharpDX.Toolkit.Game game)
-            : base(game)
+        public ScreenRendererGdi(SharpDX.Toolkit.GameSystem game, ICameraProvider camera)
+            : base(game, camera)
         {
             _desktopDC = IntPtr.Zero;
 

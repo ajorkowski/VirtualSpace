@@ -38,11 +38,10 @@
     <WarningLevel>4</WarningLevel>
   </PropertyGroup>
   <ItemGroup>
-    <Compile Include="AppContext\MenuItem.cs" />
+    <Compile Include="Device\MenuItem.cs" />
     <Compile Include="Application.cs" />
     <Compile Include="Device\IDeviceManager.cs" />
     <Compile Include="IApplication.cs" />
-    <Compile Include="AppContext\IApplicationContext.cs" />
     <Compile Include="Renderer\ICamera.cs" />
     <Compile Include="Environment.cs" />
     <Compile Include="Renderer\IRenderer.cs" />
@@ -52,7 +51,7 @@
     <Compile Include="Device\IInput.cs" />
     <Compile Include="Device\Keys.cs" />
     <Compile Include="Device\ButtonState.cs" />
-    <Compile Include="Device\IDevice.cs" />
+    <Compile Include="Device\IOutputDevice.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup />

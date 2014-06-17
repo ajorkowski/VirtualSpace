@@ -7,7 +7,7 @@ namespace VirtualSpace.Core
     public interface IEnvironment
     {
         void Initialise(IRenderer renderer, IInput input);
-        void Update(TimeSpan totalGameTime, TimeSpan elapsedGameTime, bool isRunningSlowly);
+        void Update(IRenderer renderer, TimeSpan totalGameTime, TimeSpan elapsedGameTime, bool isRunningSlowly);
 
         bool VSync { get; }
         bool ShowFPS { get; }

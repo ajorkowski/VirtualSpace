@@ -1,12 +1,16 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
+﻿using System.Collections.Generic;
 
 namespace VirtualSpace.Core.Device
 {
     public interface IDeviceManager
     {
-        IEnumerable<IDevice> GetDevices();
+        /// <summary>
+        /// Blocking call, starts the message loop
+        /// </summary>
+        /// <param name="menuItems"></param>
+        void Run(IEnumerable<MenuItem> menuItems, IEnvironment environment);
+        void Exit();
+
+        IEnumerable<IOutputDevice> GetDevices();
     }
 }

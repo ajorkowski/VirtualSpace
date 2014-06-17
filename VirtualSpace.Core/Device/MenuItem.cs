@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 
-namespace VirtualSpace.Core.AppContext
+namespace VirtualSpace.Core.Device
 {
     public class MenuItem
     {

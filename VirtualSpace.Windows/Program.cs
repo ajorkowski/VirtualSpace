@@ -16,7 +16,7 @@ namespace VirtualSpace.Window
             TinyIoCContainer.Current.AutoRegister(new List<Assembly>()
             {
                 typeof(IEnvironment).Assembly,
-                typeof(DeviceManager).Assembly
+                typeof(WindowOutputDevice).Assembly
             }, true);
 
             var app = TinyIoCContainer.Current.Resolve<IApplication>();

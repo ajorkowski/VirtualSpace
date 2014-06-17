@@ -7,7 +7,7 @@ using VirtualSpace.Platform.Windows.Rendering.Providers;
 
 namespace VirtualSpace.Platform.Windows.Rendering.Screen
 {
-    internal abstract class ScreenRenderer : GameSystem, IScreen
+    internal abstract class ScreenRenderer : SubGameSystem, IScreen
     {
         private ICameraProvider _cameraService;
         private BasicEffect _basicEffect;
@@ -16,19 +16,13 @@ namespace VirtualSpace.Platform.Windows.Rendering.Screen
         private SharpDX.Direct3D11.ShaderResourceView _planeShaderView;
         private Matrix _planeTransform;
 
-        public ScreenRenderer(Game game)
+        public ScreenRenderer(GameSystem game, ICameraProvider camera)
             : base(game)
         {
+            _cameraService = camera;
             Visible = true;
             Enabled = true;
             ScreenSize = 1;
-        }
-
-        public override void Initialize()
-        {
-            base.Initialize();
-
-            _cameraService = Services.GetService<ICameraProvider>();
         }
 
         protected override void LoadContent()

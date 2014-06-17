@@ -23,7 +23,7 @@ namespace VirtualSpace.Core
             _renderer.ScreenManager.Desktop.CurveRadius = 0;
         }
 
-        public void Update(TimeSpan totalGameTime, TimeSpan elapsedGameTime, bool isRunningSlowly)
+        public void Update(IRenderer renderer, TimeSpan totalGameTime, TimeSpan elapsedGameTime, bool isRunningSlowly)
         {
             MoveCamera(elapsedGameTime);
 

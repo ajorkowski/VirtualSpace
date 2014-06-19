@@ -7,7 +7,7 @@ using VirtualSpace.Platform.Windows.Rendering.Providers;
 
 namespace VirtualSpace.Platform.Windows.Rendering.Screen
 {
-    internal abstract class ScreenRenderer : SubGameSystem, IScreen
+    internal abstract class ScreenRenderer : GameSystem, IScreen
     {
         private ICameraProvider _cameraService;
         private BasicEffect _basicEffect;
@@ -17,7 +17,7 @@ namespace VirtualSpace.Platform.Windows.Rendering.Screen
         private Matrix _planeTransform;
 
         public ScreenRenderer(GameSystem game, ICameraProvider camera)
-            : base(game)
+            : base(game.Game)
         {
             _cameraService = camera;
             Visible = true;

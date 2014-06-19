@@ -6,7 +6,7 @@ using VirtualSpace.Platform.Windows.Rendering.Providers;
 
 namespace VirtualSpace.Platform.Windows.Rendering
 {
-    internal sealed class SceneRenderer : SubGameSystem
+    internal sealed class SceneRenderer : GameSystem
     {
         private readonly ICameraProvider _cameraService;
 
@@ -17,7 +17,7 @@ namespace VirtualSpace.Platform.Windows.Rendering
         private BasicEffect _basicEffect;
 
         public SceneRenderer(GameSystem game, ICameraProvider camera)
-            : base(game)
+            : base(game.Game)
         {
             Visible = true;
             Enabled = true;

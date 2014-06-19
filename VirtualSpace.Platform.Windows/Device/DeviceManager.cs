@@ -34,8 +34,6 @@ namespace VirtualSpace.Platform.Windows.Device
             _device.DeviceCreationFlags = SharpDX.Direct3D11.DeviceCreationFlags.Debug;
 #endif
 
-            IsMouseVisible = true;
-
             _keyboardProvider = ToDispose(new KeyboardProvider(this));
             
 
@@ -57,7 +55,7 @@ namespace VirtualSpace.Platform.Windows.Device
             Services.AddService(environment);
             _menuItems = menuItems;
 
-            base.Run();
+            base.Run(new InvisibleForm());
         }
 
         protected override void LoadContent()
@@ -77,9 +75,9 @@ namespace VirtualSpace.Platform.Windows.Device
             _trayIcon.ContextMenu = _trayMenu;
             _trayIcon.Visible = true;
 
-            //var form = (Form)Window.NativeWindow;
-            //form.Visible = true;
-            //form.ShowInTaskbar = false;
+            var form = (Form)Window.NativeWindow;
+            form.ShowInTaskbar = false;
+            Window.IsMouseVisible = true;
 
             base.LoadContent();
         }
@@ -98,6 +96,13 @@ namespace VirtualSpace.Platform.Windows.Device
                     return new MenuItem(m.Name, CreateMenuItems(m.Children));
                 }
             }).ToArray();
+        }
+
+        private class InvisibleForm : SharpDX.Windows.RenderForm
+        {
+            protected override void SetVisibleCore(bool value)
+            {
+            }
         }
     }
 }

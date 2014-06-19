@@ -2,7 +2,7 @@
 using SharpDX.Toolkit;
 using SharpDX.Toolkit.Graphics;
 using SharpDX.Windows;
-using System.Windows.Forms;
+using System.Collections.Generic;
 using VirtualSpace.Core;
 using VirtualSpace.Core.Device;
 using VirtualSpace.Core.Renderer;
@@ -56,14 +56,15 @@ namespace VirtualSpace.Platform.Windows.Rendering
 
         protected override void LoadContent()
         {
-            ((RenderForm)Window.NativeWindow).Show();
+            Window.IsMouseVisible = true;
+            Window.Visible = true;
 
             base.LoadContent();
         }
 
         protected override void UnloadContent()
         {
-            ((RenderForm)Window.NativeWindow).Close();
+            Window.Visible = false;
 
             base.UnloadContent();
         }
@@ -78,8 +79,13 @@ namespace VirtualSpace.Platform.Windows.Rendering
                 _currentVSync = _environment.VSync;
             }
 
-            _fpsRenderer.Enabled = _environment.ShowFPS;
-            _fpsRenderer.Visible = _environment.ShowFPS;
+            _sceneRenderer.Update(gameTime);
+            _screenManager.Update(gameTime);
+
+            if (_environment.ShowFPS)
+            {
+                _fpsRenderer.Update(gameTime);
+            }
 
             base.Update(gameTime);
         }
@@ -87,6 +93,14 @@ namespace VirtualSpace.Platform.Windows.Rendering
         public override void Draw(GameTime gameTime)
         {
             GraphicsDevice.Clear(Color.CornflowerBlue);
+
+            _sceneRenderer.Draw(gameTime);
+            _screenManager.Draw(gameTime);
+
+            if (_environment.ShowFPS)
+            {
+                _fpsRenderer.Draw(gameTime);
+            }
 
             base.Draw(gameTime);
         }
@@ -101,7 +115,7 @@ namespace VirtualSpace.Platform.Windows.Rendering
         private static GameContext NewWindow()
         {
             var window = new RenderForm("Virtual Space");
-            return new GameContext(window, 800, 600);
+            return new GameContext(window, 1024, 800);
         }
     }
 }

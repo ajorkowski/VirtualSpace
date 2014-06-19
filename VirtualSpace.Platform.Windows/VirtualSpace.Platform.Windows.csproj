@@ -90,7 +90,6 @@
     <Compile Include="Rendering\FpsRenderer.cs" />
     <Compile Include="Rendering\SceneRenderer.cs" />
     <Compile Include="Rendering\Screen\ScreenRenderer.cs" />
-    <Compile Include="Rendering\SubGameSystem.cs" />
     <Compile Include="Rendering\WindowOutputRenderer.cs" />
   </ItemGroup>
   <ItemGroup>

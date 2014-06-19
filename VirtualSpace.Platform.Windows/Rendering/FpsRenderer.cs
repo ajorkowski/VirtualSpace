@@ -6,7 +6,7 @@ using System.Diagnostics;
 
 namespace VirtualSpace.Platform.Windows.Rendering
 {
-    internal sealed class FpsRenderer : SubGameSystem
+    internal sealed class FpsRenderer : GameSystem
     {
         private const string CpuCounterName = @"\Processor(0)\% Processor Time";
 
@@ -26,11 +26,10 @@ namespace VirtualSpace.Platform.Windows.Rendering
         private SpriteBatch _spriteBatch;
 
         public FpsRenderer(GameSystem game)
-            : base(game)
+            : base(game.Game)
         {
             Visible = true;
             Enabled = true;
-            DrawOrder = int.MaxValue;
         }
 
         public override void Initialize()

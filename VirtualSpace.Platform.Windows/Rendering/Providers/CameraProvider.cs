@@ -59,7 +59,7 @@ namespace VirtualSpace.Platform.Windows.Rendering.Providers
 
         public void MoveTo(float x, float y, float z)
         {
-            _view.TranslationVector = new Vector3(x, y, -z);
+            _view.TranslationVector = new Vector3(x, y, z);
         }
 
         public void LookAt(float x, float y, float z)

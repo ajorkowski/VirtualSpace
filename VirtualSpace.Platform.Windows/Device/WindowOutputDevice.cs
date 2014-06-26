@@ -30,17 +30,17 @@ namespace VirtualSpace.Platform.Windows.Device
                 throw new InvalidOperationException("That device is already running!");
             }
 
-            //_source = new CancellationTokenSource();
-            //_rendererTask = Task.Run(() =>
-            //{
+            _source = new CancellationTokenSource();
+            _rendererTask = Task.Run(() =>
+            {
                 using (var renderer = new WindowOutputRenderer())
                 {
                     bool isRunning = true;
-                    //_source.Token.Register(() => { if (isRunning) renderer.Exit(); }, true);
+                    _source.Token.Register(() => { if (isRunning) renderer.Exit(); }, true);
                     renderer.Run(_manager.Environment);
                     isRunning = false;
                 }
-            //});
+            });
         }
 
         public void Stop()

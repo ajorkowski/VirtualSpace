@@ -32,24 +32,22 @@ namespace VirtualSpace.Platform.Windows.Device
         {
             _environment = environment;
 
-            _window.Run();
+            _trayMenu = new ContextMenu();
+            var items = CreateMenuItems(menuItems);
+            foreach (var i in items)
+            {
+                _trayMenu.MenuItems.Add(i);
+            }
 
-            //_trayMenu = new ContextMenu();
-            //var items = CreateMenuItems(menuItems);
-            //foreach (var i in items)
-            //{
-            //    _trayMenu.MenuItems.Add(i);
-            //}
+            _trayIcon = new NotifyIcon();
+            _trayIcon.Text = "Virtual Space";
+            _trayIcon.Icon = new Icon(SystemIcons.Application, 40, 40);
 
-            //_trayIcon = new NotifyIcon();
-            //_trayIcon.Text = "Virtual Space";
-            //_trayIcon.Icon = new Icon(SystemIcons.Application, 40, 40);
+            // Add menu to tray icon and show it.
+            _trayIcon.ContextMenu = _trayMenu;
+            _trayIcon.Visible = true;
 
-            //// Add menu to tray icon and show it.
-            //_trayIcon.ContextMenu = _trayMenu;
-            //_trayIcon.Visible = true;
-
-            //System.Windows.Forms.Application.Run(new DeviceManagerContext());
+            System.Windows.Forms.Application.Run(/*new DeviceManagerContext()*/);
         }
 
         public void Exit()
@@ -88,22 +86,22 @@ namespace VirtualSpace.Platform.Windows.Device
             _window.Dispose();
         }
 
-        private class DeviceManagerContext : ApplicationContext
-        {
-            protected override void OnMainFormClosed(object sender, EventArgs e)
-            {
-                base.OnMainFormClosed(sender, e);
-            }
+        //private class DeviceManagerContext : ApplicationContext
+        //{
+        //    protected override void OnMainFormClosed(object sender, EventArgs e)
+        //    {
+        //        base.OnMainFormClosed(sender, e);
+        //    }
 
-            protected override void ExitThreadCore()
-            {
-                base.ExitThreadCore();
-            }
+        //    protected override void ExitThreadCore()
+        //    {
+        //        base.ExitThreadCore();
+        //    }
 
-            protected override void Dispose(bool disposing)
-            {
-                base.Dispose(disposing);
-            }
-        }
+        //    protected override void Dispose(bool disposing)
+        //    {
+        //        base.Dispose(disposing);
+        //    }
+        //}
     }
 }

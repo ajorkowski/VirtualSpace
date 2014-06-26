@@ -1,9 +1,6 @@
 ﻿using SharpDX;
-using SharpDX.Direct3D;
 using SharpDX.Toolkit;
 using SharpDX.Toolkit.Graphics;
-using System;
-using System.ComponentModel;
 using System.Linq;
 using VirtualSpace.Core;
 using VirtualSpace.Core.Device;
@@ -34,9 +31,9 @@ namespace VirtualSpace.Platform.Windows.Rendering
 #endif
 
             _device = new GraphicsDeviceManager(this);
-#if DEBUG
-            _device.DeviceCreationFlags = SharpDX.Direct3D11.DeviceCreationFlags.Debug;
-#endif
+//#if DEBUG
+//            _device.DeviceCreationFlags = SharpDX.Direct3D11.DeviceCreationFlags.Debug;
+//#endif
 
             Content.RootDirectory = "Content";
 
@@ -55,31 +52,31 @@ namespace VirtualSpace.Platform.Windows.Rendering
 
         protected override void Initialize()
         {
+            _keyboardProvider = ToDispose(new KeyboardProvider(this));
+            _cameraProvider = ToDispose(new CameraProvider(this));
+            _screenManager = ToDispose(new ScreenManager(this, _cameraProvider));
+            _fpsRenderer = ToDispose(new FpsRenderer(this));
+            _sceneRenderer = ToDispose(new SceneRenderer(this, _cameraProvider));
+
             base.Initialize();
 
-            //_keyboardProvider = ToDispose(new KeyboardProvider(this));
-            //_cameraProvider = ToDispose(new CameraProvider(this));
-            //_screenManager = ToDispose(new ScreenManager(this, _cameraProvider));
-            //_fpsRenderer = ToDispose(new FpsRenderer(this));
-            //_sceneRenderer = ToDispose(new SceneRenderer(this, _cameraProvider));
+            _environment.Initialise(this, _keyboardProvider);
 
-            //_environment.Initialise(this, _keyboardProvider);
-
-            //_currentVSync = GraphicsDevice.Presenter.PresentInterval != PresentInterval.Immediate;
+            _currentVSync = GraphicsDevice.Presenter.PresentInterval != PresentInterval.Immediate;
         }
 
         protected override void Update(GameTime gameTime)
         {
-            //_environment.Update(this, gameTime.TotalGameTime, gameTime.ElapsedGameTime, gameTime.IsRunningSlowly);
+            _environment.Update(this, gameTime.TotalGameTime, gameTime.ElapsedGameTime, gameTime.IsRunningSlowly);
 
-            //if (_environment.VSync != _currentVSync)
-            //{
-            //    GraphicsDevice.Presenter.PresentInterval = _environment.VSync ? PresentInterval.One : PresentInterval.Immediate;
-            //    _currentVSync = _environment.VSync;
-            //}
+            if (_environment.VSync != _currentVSync)
+            {
+                GraphicsDevice.Presenter.PresentInterval = _environment.VSync ? PresentInterval.One : PresentInterval.Immediate;
+                _currentVSync = _environment.VSync;
+            }
 
-            //_fpsRenderer.Enabled = _environment.ShowFPS;
-            //_fpsRenderer.Visible = _environment.ShowFPS;
+            _fpsRenderer.Enabled = _environment.ShowFPS;
+            _fpsRenderer.Visible = _environment.ShowFPS;
 
             base.Update(gameTime);
         }
@@ -93,22 +90,16 @@ namespace VirtualSpace.Platform.Windows.Rendering
 
         protected override void Dispose(bool disposeManagedResources)
         {
-            //if (disposeManagedResources)
-            //{
-            //    foreach (var gs in GameSystems.ToList())
-            //    {
-            //        GameSystems.Remove(gs);
-            //        (gs as IContentable).UnloadContent();
-            //    }
-            //}
+            if (disposeManagedResources)
+            {
+                foreach (var gs in GameSystems.ToList())
+                {
+                    GameSystems.Remove(gs);
+                    (gs as IContentable).UnloadContent();
+                }
+            }
 
             base.Dispose(disposeManagedResources);
         }
-
-        //private static GameContext NewWindow()
-        //{
-        //    var window = new RenderForm("Virtual Space");
-        //    return new GameContext(window, 1024, 800);
-        //}
     }
 }

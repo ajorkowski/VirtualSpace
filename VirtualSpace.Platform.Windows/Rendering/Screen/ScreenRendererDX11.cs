@@ -167,7 +167,10 @@ namespace VirtualSpace.Platform.Windows.Rendering.Screen
             _isRunning = false;
             if (_captureLoop != null)
             {
-                _captureLoop.Wait();
+                if (_captureLoop.Status == TaskStatus.Running)
+                {
+                    _captureLoop.Wait();
+                }
                 _captureLoop.Dispose();
                 _captureLoop = null;
             }
@@ -201,7 +204,9 @@ namespace VirtualSpace.Platform.Windows.Rendering.Screen
                 }
                 catch(SharpDXException e)
                 {
-                    if (e.ResultCode == Result.WaitTimeout || e.ResultCode.Code == -2005270489)
+                    if (e.ResultCode == Result.WaitTimeout 
+                        || e.ResultCode.Code == -2005270489 
+                        || e.ResultCode.Code == -2005270490) // Abandoned error (might happen while disposing)
                     {
                         continue;
                     }

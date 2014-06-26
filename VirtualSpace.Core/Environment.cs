@@ -19,6 +19,7 @@ namespace VirtualSpace.Core
             _input = input;
             _renderer = renderer;
             _renderer.Camera.MoveTo(0, 0, 20);
+            _renderer.Camera.LookAt(0, 0, 0);
             _renderer.ScreenManager.Desktop.ScreenSize = 17.2f;
             _renderer.ScreenManager.Desktop.CurveRadius = 0;
         }

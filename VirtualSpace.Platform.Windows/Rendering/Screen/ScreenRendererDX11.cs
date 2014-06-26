@@ -68,7 +68,7 @@ namespace VirtualSpace.Platform.Windows.Rendering.Screen
             }
         }
 
-        public ScreenRendererDX11(SharpDX.Toolkit.GameSystem game, ICameraProvider camera)
+        public ScreenRendererDX11(SharpDX.Toolkit.Game game, ICameraProvider camera)
             : base(game, camera)
         {
         }

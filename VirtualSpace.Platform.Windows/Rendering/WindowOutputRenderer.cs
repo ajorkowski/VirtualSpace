@@ -1,8 +1,10 @@
 ﻿using SharpDX;
+using SharpDX.Direct3D;
 using SharpDX.Toolkit;
 using SharpDX.Toolkit.Graphics;
-using SharpDX.Windows;
-using System.Collections.Generic;
+using System;
+using System.ComponentModel;
+using System.Linq;
 using VirtualSpace.Core;
 using VirtualSpace.Core.Device;
 using VirtualSpace.Core.Renderer;
@@ -12,9 +14,10 @@ using VirtualSpace.Platform.Windows.Rendering.Screen;
 
 namespace VirtualSpace.Platform.Windows.Rendering
 {
-    internal sealed class WindowOutputRenderer : GameWindowRenderer, IRenderer
+    public sealed class WindowOutputRenderer : Game, IRenderer
     {
-        private readonly IInput _input;
+        private readonly GraphicsDeviceManager _device;
+        private KeyboardProvider _keyboardProvider;
 
         private CameraProvider _cameraProvider;
         private ScreenManager _screenManager;
@@ -24,98 +27,88 @@ namespace VirtualSpace.Platform.Windows.Rendering
 
         private bool _currentVSync;
 
-        public WindowOutputRenderer(Game game, IInput input)
-            : base(game, NewWindow())
+        public WindowOutputRenderer()
         {
-            Enabled = true;
-            Visible = true;
+#if DEBUG
+            SharpDX.Configuration.EnableObjectTracking = true;
+#endif
 
-            _input = input;
-            
-            game.GameSystems.Add(this);
+            _device = new GraphicsDeviceManager(this);
+#if DEBUG
+            _device.DeviceCreationFlags = SharpDX.Direct3D11.DeviceCreationFlags.Debug;
+#endif
+
+            Content.RootDirectory = "Content";
+
+            IsMouseVisible = true;
         }
 
-        public IInput Input { get { return _input; } }
+        public IInput Input { get { return _keyboardProvider; } }
         public ICamera Camera { get { return _cameraProvider; } }
         public IScreenManager ScreenManager { get { return _screenManager; } }
 
-        public override void Initialize()
+        public void Run(IEnvironment environment)
+        {
+            _environment = environment;
+            base.Run();
+        }
+
+        protected override void Initialize()
         {
             base.Initialize();
 
-            _cameraProvider = ToDispose(new CameraProvider(this));
-            _screenManager = ToDispose(new ScreenManager(this, _cameraProvider));
-            _fpsRenderer = ToDispose(new FpsRenderer(this));
-            _sceneRenderer = ToDispose(new SceneRenderer(this, _cameraProvider));
+            //_keyboardProvider = ToDispose(new KeyboardProvider(this));
+            //_cameraProvider = ToDispose(new CameraProvider(this));
+            //_screenManager = ToDispose(new ScreenManager(this, _cameraProvider));
+            //_fpsRenderer = ToDispose(new FpsRenderer(this));
+            //_sceneRenderer = ToDispose(new SceneRenderer(this, _cameraProvider));
 
-            _environment = Services.GetService<IEnvironment>();
-            _environment.Initialise(this, _input);
+            //_environment.Initialise(this, _keyboardProvider);
 
-            _currentVSync = GraphicsDevice.Presenter.PresentInterval != PresentInterval.Immediate;
+            //_currentVSync = GraphicsDevice.Presenter.PresentInterval != PresentInterval.Immediate;
         }
 
-        protected override void LoadContent()
+        protected override void Update(GameTime gameTime)
         {
-            Window.IsMouseVisible = true;
-            Window.Visible = true;
+            //_environment.Update(this, gameTime.TotalGameTime, gameTime.ElapsedGameTime, gameTime.IsRunningSlowly);
 
-            base.LoadContent();
-        }
+            //if (_environment.VSync != _currentVSync)
+            //{
+            //    GraphicsDevice.Presenter.PresentInterval = _environment.VSync ? PresentInterval.One : PresentInterval.Immediate;
+            //    _currentVSync = _environment.VSync;
+            //}
 
-        protected override void UnloadContent()
-        {
-            Window.Visible = false;
-
-            base.UnloadContent();
-        }
-
-        public override void Update(GameTime gameTime)
-        {
-            _environment.Update(this, gameTime.TotalGameTime, gameTime.ElapsedGameTime, gameTime.IsRunningSlowly);
-
-            if (_environment.VSync != _currentVSync)
-            {
-                GraphicsDevice.Presenter.PresentInterval = _environment.VSync ? PresentInterval.One : PresentInterval.Immediate;
-                _currentVSync = _environment.VSync;
-            }
-
-            _sceneRenderer.Update(gameTime);
-            _screenManager.Update(gameTime);
-
-            if (_environment.ShowFPS)
-            {
-                _fpsRenderer.Update(gameTime);
-            }
+            //_fpsRenderer.Enabled = _environment.ShowFPS;
+            //_fpsRenderer.Visible = _environment.ShowFPS;
 
             base.Update(gameTime);
         }
 
-        public override void Draw(GameTime gameTime)
+        protected override void Draw(GameTime gameTime)
         {
             GraphicsDevice.Clear(Color.CornflowerBlue);
-
-            _sceneRenderer.Draw(gameTime);
-            _screenManager.Draw(gameTime);
-
-            if (_environment.ShowFPS)
-            {
-                _fpsRenderer.Draw(gameTime);
-            }
 
             base.Draw(gameTime);
         }
 
         protected override void Dispose(bool disposeManagedResources)
         {
-            Game.GameSystems.Remove(this);
+            //if (disposeManagedResources)
+            //{
+            //    foreach (var gs in GameSystems.ToList())
+            //    {
+            //        GameSystems.Remove(gs);
+            //        (gs as IContentable).UnloadContent();
+            //    }
+            //}
 
             base.Dispose(disposeManagedResources);
         }
 
-        private static GameContext NewWindow()
-        {
-            var window = new RenderForm("Virtual Space");
-            return new GameContext(window, 1024, 800);
-        }
+        //private static GameContext NewWindow()
+        //{
+        //    var window = new RenderForm("Virtual Space");
+        //    return new GameContext(window, 1024, 800);
+        //}
     }
 }

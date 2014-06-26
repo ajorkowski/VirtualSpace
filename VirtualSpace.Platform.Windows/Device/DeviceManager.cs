@@ -1,45 +1,24 @@
-﻿using SharpDX.Toolkit;
+﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Linq;
 using System.Windows.Forms;
 using VirtualSpace.Core;
-using VirtualSpace.Platform.Windows.Rendering.Providers;
 using D = VirtualSpace.Core.Device;
 
 namespace VirtualSpace.Platform.Windows.Device
 {
-    public class DeviceManager : Game, D.IDeviceManager
+    public sealed class DeviceManager : D.IDeviceManager, IDisposable
     {
-        private readonly GraphicsDeviceManager _device;
-        private readonly KeyboardProvider _keyboardProvider;
-
-        private IEnumerable<D.MenuItem> _menuItems;
-        private IEnvironment _environment;
-
         private NotifyIcon _trayIcon;
         private ContextMenu _trayMenu;
+        private IEnvironment _environment;
 
         private D.IOutputDevice _window;
 
         public DeviceManager()
         {
-#if DEBUG
-            SharpDX.Configuration.EnableObjectTracking = true;
-#endif
-
-            _device = ToDispose(new GraphicsDeviceManager(this));
-
-#if DEBUG
-            _device.DeviceCreationFlags = SharpDX.Direct3D11.DeviceCreationFlags.Debug;
-#endif
-
-            _keyboardProvider = ToDispose(new KeyboardProvider(this));
-            
-
-            Content.RootDirectory = "Content";
-
-            _window = ToDispose(new WindowOutputDevice(this));
+            _window = new WindowOutputDevice(this);
         }
 
         public IEnumerable<D.IOutputDevice> GetDevices()
@@ -47,39 +26,35 @@ namespace VirtualSpace.Platform.Windows.Device
             return new List<D.IOutputDevice> { _window };
         }
 
-        public D.IInput Input { get { return _keyboardProvider; } }
+        public IEnvironment Environment { get { return _environment; } }
 
         public void Run(IEnumerable<D.MenuItem> menuItems, IEnvironment environment)
         {
             _environment = environment;
-            Services.AddService(environment);
-            _menuItems = menuItems;
 
-            base.Run(new InvisibleForm());
+            _window.Run();
+
+            //_trayMenu = new ContextMenu();
+            //var items = CreateMenuItems(menuItems);
+            //foreach (var i in items)
+            //{
+            //    _trayMenu.MenuItems.Add(i);
+            //}
+
+            //_trayIcon = new NotifyIcon();
+            //_trayIcon.Text = "Virtual Space";
+            //_trayIcon.Icon = new Icon(SystemIcons.Application, 40, 40);
+
+            //// Add menu to tray icon and show it.
+            //_trayIcon.ContextMenu = _trayMenu;
+            //_trayIcon.Visible = true;
+
+            //System.Windows.Forms.Application.Run(new DeviceManagerContext());
         }
 
-        protected override void LoadContent()
+        public void Exit()
         {
-            _trayMenu = ToDisposeContent(new ContextMenu());
-            var items = CreateMenuItems(_menuItems);
-            foreach (var i in items)
-            {
-                _trayMenu.MenuItems.Add(i);
-            }
-
-            _trayIcon = ToDisposeContent(new NotifyIcon());
-            _trayIcon.Text = "Virtual Space";
-            _trayIcon.Icon = new Icon(SystemIcons.Application, 40, 40);
-
-            // Add menu to tray icon and show it.
-            _trayIcon.ContextMenu = _trayMenu;
-            _trayIcon.Visible = true;
-
-            var form = (Form)Window.NativeWindow;
-            form.ShowInTaskbar = false;
-            Window.IsMouseVisible = true;
-
-            base.LoadContent();
+            System.Windows.Forms.Application.Exit();
         }
 
         private MenuItem[] CreateMenuItems(IEnumerable<D.MenuItem> menuItems)
@@ -98,10 +73,36 @@ namespace VirtualSpace.Platform.Windows.Device
             }).ToArray();
         }
 
-        private class InvisibleForm : SharpDX.Windows.RenderForm
+        public void Dispose()
         {
-            protected override void SetVisibleCore(bool value)
+            if (_trayIcon != null)
             {
+                _trayIcon.Dispose();
+            }
+
+            if (_trayMenu != null)
+            {
+                _trayMenu.Dispose();
+            }
+
+            _window.Dispose();
+        }
+
+        private class DeviceManagerContext : ApplicationContext
+        {
+            protected override void OnMainFormClosed(object sender, EventArgs e)
+            {
+                base.OnMainFormClosed(sender, e);
+            }
+
+            protected override void ExitThreadCore()
+            {
+                base.ExitThreadCore();
+            }
+
+            protected override void Dispose(bool disposing)
+            {
+                base.Dispose(disposing);
             }
         }
     }

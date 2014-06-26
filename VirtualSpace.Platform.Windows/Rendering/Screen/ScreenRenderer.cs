@@ -16,8 +16,8 @@ namespace VirtualSpace.Platform.Windows.Rendering.Screen
         private SharpDX.Direct3D11.ShaderResourceView _planeShaderView;
         private Matrix _planeTransform;
 
-        public ScreenRenderer(GameSystem game, ICameraProvider camera)
-            : base(game.Game)
+        public ScreenRenderer(Game game, ICameraProvider camera)
+            : base(game)
         {
             _cameraService = camera;
             Visible = true;

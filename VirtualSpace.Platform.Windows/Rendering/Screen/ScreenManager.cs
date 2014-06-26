@@ -8,20 +8,22 @@ namespace VirtualSpace.Platform.Windows.Rendering.Screen
     {
         private readonly ScreenRenderer _desktop;
 
-        public ScreenManager(GameSystem game, ICameraProvider camera)
-            : base(game.Game)
+        public ScreenManager(Game game, ICameraProvider camera)
+            : base(game)
         {
             Enabled = true;
             Visible = true;
 
             if (Screen.ScreenRendererDX11.IsSupported)
             {
-                _desktop = ToDispose(new Screen.ScreenRendererDX11(this, camera));
+                _desktop = ToDispose(new Screen.ScreenRendererDX11(game, camera));
             }
             else
             {
-                _desktop = ToDispose(new Screen.ScreenRendererGdi(this, camera));
+                _desktop = ToDispose(new Screen.ScreenRendererGdi(game, camera));
             }
+
+            game.GameSystems.Add(_desktop);
         }
 
         public IScreen Desktop { get { return _desktop; } }

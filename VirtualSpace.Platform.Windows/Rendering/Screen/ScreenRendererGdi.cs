@@ -5,6 +5,7 @@ using System;
 using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
+using VirtualSpace.Core;
 using VirtualSpace.Platform.Windows.Rendering.Providers;
 
 namespace VirtualSpace.Platform.Windows.Rendering.Screen
@@ -26,7 +27,7 @@ namespace VirtualSpace.Platform.Windows.Rendering.Screen
         private bool _isRunning;
         private Task _captureLoop;
 
-        public ScreenRendererGdi(SharpDX.Toolkit.GameSystem game, ICameraProvider camera)
+        public ScreenRendererGdi(SharpDX.Toolkit.Game game, ICameraProvider camera)
             : base(game, camera)
         {
             _desktopDC = IntPtr.Zero;
@@ -73,30 +74,29 @@ namespace VirtualSpace.Platform.Windows.Rendering.Screen
             _gdiTexture = ToDisposeContent(new SharpDX.Direct3D11.Texture2D(_captureDevice, sharedDesc));
 
             _desktopDC = GetDC(IntPtr.Zero);
+            ToDisposeContent(new Disposable(() => 
+            {
+                if (_desktopDC != IntPtr.Zero)
+                {
+                    ReleaseDC(IntPtr.Zero, _desktopDC);
+                    _desktopDC = IntPtr.Zero;
+                }
+            }));
 
             _isRunning = true;
             _captureLoop = Task.Run(() => CaptureLoop());
+            ToDisposeContent(new Disposable(() =>
+            {
+                _isRunning = false;
+                if (_captureLoop != null)
+                {
+                    _captureLoop.Wait();
+                    _captureLoop.Dispose();
+                    _captureLoop = null;
+                }
+            }));
 
             base.LoadContent();
-        }
-
-        protected override void UnloadContent()
-        {
-            base.UnloadContent();
-
-            if (_desktopDC != IntPtr.Zero)
-            {
-                ReleaseDC(IntPtr.Zero, _desktopDC);
-                _desktopDC = IntPtr.Zero;
-            }
-
-            _isRunning = false;
-            if (_captureLoop != null)
-            {
-                _captureLoop.Wait();
-                _captureLoop.Dispose();
-                _captureLoop = null;
-            }
         }
 
         public override void Draw(SharpDX.Toolkit.GameTime gameTime)

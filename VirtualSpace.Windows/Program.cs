@@ -1,4 +1,6 @@
-﻿using System;
+﻿using SharpDX;
+using SharpDX.Toolkit;
+using System;
 using System.Collections.Generic;
 using System.Reflection;
 using TinyIoC;
@@ -13,15 +15,19 @@ namespace VirtualSpace.Window
         static void Main(string[] args)
         {
             // Setup container
-            TinyIoCContainer.Current.AutoRegister(new List<Assembly>()
-            {
-                typeof(IEnvironment).Assembly,
-                typeof(WindowOutputDevice).Assembly
-            }, true);
+            //TinyIoCContainer.Current.AutoRegister(new List<Assembly>()
+            //{
+            //    typeof(IEnvironment).Assembly,
+            //    typeof(WindowOutputDevice).Assembly
+            //}, true);
 
-            var app = TinyIoCContainer.Current.Resolve<IApplication>();
-            app.Run();
-            TinyIoCContainer.Current.Dispose();
+            //var app = TinyIoCContainer.Current.Resolve<IApplication>();
+            //app.Run();
+            //TinyIoCContainer.Current.Dispose();
+
+            var renderer = new VirtualSpace.Platform.Windows.Rendering.WindowOutputRenderer();
+            renderer.Run(null);
+            renderer.Dispose();
         }
     }
 }

@@ -25,11 +25,13 @@ namespace VirtualSpace.Platform.Windows.Rendering
         private SpriteFont _spriteFont;
         private SpriteBatch _spriteBatch;
 
-        public FpsRenderer(GameSystem game)
-            : base(game.Game)
+        public FpsRenderer(Game game)
+            : base(game)
         {
             Visible = true;
             Enabled = true;
+
+            game.GameSystems.Add(this);
         }
 
         public override void Initialize()

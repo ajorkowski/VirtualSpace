@@ -1,4 +1,5 @@
-﻿using VirtualSpace.Core.Renderer.Screen;
+﻿using System;
+using VirtualSpace.Core.Renderer.Screen;
 
 namespace VirtualSpace.Core.Renderer
 {

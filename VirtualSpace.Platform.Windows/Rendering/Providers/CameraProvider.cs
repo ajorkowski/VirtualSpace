@@ -9,10 +9,13 @@ namespace VirtualSpace.Platform.Windows.Rendering.Providers
         private Matrix _view;
         private Matrix _projection;
 
-        public CameraProvider(GameSystem parent)
-            : base(parent.Game)
+        public CameraProvider(Game game)
+            : base(game)
         {
             Enabled = true;
+            Visible = false;
+
+            game.GameSystems.Add(this);
         }
 
         public Matrix View { get { return _view; } }

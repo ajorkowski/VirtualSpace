@@ -16,20 +16,15 @@ namespace VirtualSpace.Platform.Windows.Rendering
 
         private BasicEffect _basicEffect;
 
-        public SceneRenderer(GameSystem game, ICameraProvider camera)
-            : base(game.Game)
+        public SceneRenderer(Game game, ICameraProvider camera)
+            : base(game)
         {
             Visible = true;
             Enabled = true;
 
             _cameraService = camera;
-        }
 
-        public override void Initialize()
-        {
-            base.Initialize();
-
-            var environment = Services.GetService<IEnvironment>();
+            game.GameSystems.Add(this);
         }
 
         protected override void LoadContent()

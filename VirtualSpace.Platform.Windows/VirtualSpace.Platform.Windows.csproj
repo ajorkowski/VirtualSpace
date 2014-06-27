@@ -42,6 +42,9 @@
     <Reference Include="SharpDX.DXGI">
       <HintPath>$(SharpDXPackageBinDir)\SharpDX.DXGI.dll</HintPath>
     </Reference>
+    <Reference Include="SharpDX.MediaFoundation">
+      <HintPath>$(SharpDXPackageBinDir)\SharpDX.MediaFoundation.dll</HintPath>
+    </Reference>
     <Reference Include="SharpDX.Toolkit">
       <HintPath>$(SharpDXPackageBinDir)\SharpDX.Toolkit.dll</HintPath>
     </Reference>
@@ -72,6 +75,7 @@
     <Compile Include="Rendering\Screen\ScreenRenderer.cs" />
     <Compile Include="Rendering\Screen\ScreenRendererDX11.cs" />
     <Compile Include="Rendering\Screen\ScreenRendererGdi.cs" />
+    <Compile Include="Rendering\Screen\VideoRenderer.cs" />
     <Compile Include="Rendering\WindowOutputRenderer.cs" />
   </ItemGroup>
   <ItemGroup>

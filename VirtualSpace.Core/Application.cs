@@ -31,8 +31,8 @@ namespace VirtualSpace.Core
         {
             var device = _deviceManager.GetDevices().First();
             device.Run();
-            await Task.Delay(5000);
-            device.Stop();
+            //await Task.Delay(5000);
+            //device.Stop();
         }
     }
 }

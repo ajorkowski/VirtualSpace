@@ -125,7 +125,10 @@ namespace VirtualSpace.Platform.Windows.Rendering.Screen
             _isRunning = false;
             if (_captureLoop != null)
             {
-                _captureLoop.Wait();
+                if (_captureLoop.Status == TaskStatus.Running)
+                {
+                    _captureLoop.Wait();
+                }
                 _captureLoop.Dispose();
                 _captureLoop = null;
             }

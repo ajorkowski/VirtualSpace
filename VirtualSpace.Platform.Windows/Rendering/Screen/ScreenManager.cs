@@ -14,14 +14,15 @@ namespace VirtualSpace.Platform.Windows.Rendering.Screen
             Enabled = true;
             Visible = true;
 
-            if (Screen.ScreenRendererDX11.IsSupported)
-            {
-                _desktop = ToDispose(new Screen.ScreenRendererDX11(game, camera));
-            }
-            else
-            {
-                _desktop = ToDispose(new Screen.ScreenRendererGdi(game, camera));
-            }
+            //if (Screen.ScreenRendererDX11.IsSupported)
+            //{
+            //    _desktop = ToDispose(new Screen.ScreenRendererDX11(game, camera));
+            //}
+            //else
+            //{
+            //    _desktop = ToDispose(new Screen.ScreenRendererGdi(game, camera));
+            //}
+            _desktop = ToDispose(new Screen.VideoRenderer(game, camera, "D:/Movies/The Past aka Le Passe [2013]-720p-BRrip-x264-StyLishSaLH (StyLish Release)/The Past aka Le Passe [2013]-720p-BRrip-x264-StyLishSaLH (StyLish Release).mp4"));
 
             game.GameSystems.Add(_desktop);
         }

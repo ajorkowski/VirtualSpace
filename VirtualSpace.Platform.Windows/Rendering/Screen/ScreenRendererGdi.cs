@@ -166,12 +166,6 @@ namespace VirtualSpace.Platform.Windows.Rendering.Screen
             }
         }
 
-        protected override void Dispose(bool disposeManagedResources)
-        {
-            UnloadContent();
-            base.Dispose(disposeManagedResources);
-        }
-
         [DllImport("user32.dll", SetLastError = true)]
         private static extern IntPtr GetDC(IntPtr hWnd);
 

@@ -24,6 +24,7 @@ namespace VirtualSpace.Core
                 new MenuItem { Name = "Exit", Click = () => _deviceManager.Exit() }
             };
 
+            RunDevice();
             _deviceManager.Run(menuItems, _environment);
         }
 

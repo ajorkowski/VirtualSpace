@@ -76,6 +76,7 @@
     <Compile Include="Rendering\Screen\ScreenRendererDX11.cs" />
     <Compile Include="Rendering\Screen\ScreenRendererGdi.cs" />
     <Compile Include="Rendering\Screen\VideoRenderer.cs" />
+    <Compile Include="Rendering\Video\VideoSource.cs" />
     <Compile Include="Rendering\WindowOutputRenderer.cs" />
   </ItemGroup>
   <ItemGroup>

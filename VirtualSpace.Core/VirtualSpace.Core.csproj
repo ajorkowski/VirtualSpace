@@ -73,7 +73,6 @@
     <Compile Include="Device\ButtonState.cs" />
     <Compile Include="Device\IOutputDevice.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
-    <Compile Include="Renderer\Screen\IVideoScreen.cs" />
   </ItemGroup>
   <ItemGroup />
   <Import Project="$(MSBuildExtensionsPath32)\Microsoft\Portable\$(TargetFrameworkVersion)\Microsoft.Portable.CSharp.targets" />

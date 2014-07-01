@@ -22,7 +22,7 @@ namespace VirtualSpace.Platform.Windows.Rendering.Screen
             //{
             //    _desktop = ToDispose(new Screen.ScreenRendererGdi(game, camera));
             //}
-            _desktop = ToDispose(new Screen.VideoRenderer(game, camera, "D:/Movies/The Past aka Le Passe [2013]-720p-BRrip-x264-StyLishSaLH (StyLish Release)/The Past aka Le Passe [2013]-720p-BRrip-x264-StyLishSaLH (StyLish Release).mp4"));
+            _desktop = ToDispose(new Screen.VideoRenderer(game, camera, "C:\\Users\\Public\\Videos\\Sample Videos\\Wildlife.wmv"));//"D:/Movies/The Past aka Le Passe [2013]-720p-BRrip-x264-StyLishSaLH (StyLish Release)/The Past aka Le Passe [2013]-720p-BRrip-x264-StyLishSaLH (StyLish Release).mp4"));
 
             game.GameSystems.Add(_desktop);
         }

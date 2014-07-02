@@ -47,7 +47,7 @@ namespace VirtualSpace.Platform.Windows.Device
             _trayIcon.ContextMenu = _trayMenu;
             _trayIcon.Visible = true;
 
-            System.Windows.Forms.Application.Run(/*new DeviceManagerContext()*/);
+            System.Windows.Forms.Application.Run();
         }
 
         public void Exit()
@@ -85,23 +85,5 @@ namespace VirtualSpace.Platform.Windows.Device
 
             _window.Dispose();
         }
-
-        //private class DeviceManagerContext : ApplicationContext
-        //{
-        //    protected override void OnMainFormClosed(object sender, EventArgs e)
-        //    {
-        //        base.OnMainFormClosed(sender, e);
-        //    }
-
-        //    protected override void ExitThreadCore()
-        //    {
-        //        base.ExitThreadCore();
-        //    }
-
-        //    protected override void Dispose(bool disposing)
-        //    {
-        //        base.Dispose(disposing);
-        //    }
-        //}
     }
 }

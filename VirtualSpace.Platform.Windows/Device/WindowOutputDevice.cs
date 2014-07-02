@@ -25,7 +25,7 @@ namespace VirtualSpace.Platform.Windows.Device
 
         public void Run()
         {
-            if (_rendererTask != null)
+            if (_source != null)
             {
                 throw new InvalidOperationException("That device is already running!");
             }
@@ -40,6 +40,9 @@ namespace VirtualSpace.Platform.Windows.Device
                     renderer.Run(_manager.Environment);
                     isRunning = false;
                 }
+
+                _source.Dispose();
+                _source = null;
             });
         }
 
@@ -50,8 +53,6 @@ namespace VirtualSpace.Platform.Windows.Device
                 _source.Cancel();
                 _rendererTask.Wait();
                 _rendererTask.Dispose();
-                _source.Dispose();
-                _source = null;
                 _rendererTask = null;
             }
         }

@@ -1,13 +1,15 @@
 ﻿using SharpDX;
+using SharpDX.DXGI;
 using SharpDX.Toolkit;
 using SharpDX.Toolkit.Graphics;
 using System;
+using VirtualSpace.Core;
 using VirtualSpace.Core.Renderer.Screen;
 using VirtualSpace.Platform.Windows.Rendering.Providers;
 
 namespace VirtualSpace.Platform.Windows.Rendering.Screen
 {
-    internal abstract class ScreenRenderer : GameSystem, IScreen
+    internal sealed class ScreenRenderer : GameSystem, IScreen
     {
         private ICameraProvider _cameraService;
         private BasicEffect _basicEffect;
@@ -16,30 +18,47 @@ namespace VirtualSpace.Platform.Windows.Rendering.Screen
         private SharpDX.Direct3D11.ShaderResourceView _planeShaderView;
         private Matrix _planeTransform;
 
-        public ScreenRenderer(Game game, ICameraProvider camera)
+        private IScreenSource _source;
+        private KeyedMutex _renderMutex;
+
+        public ScreenRenderer(Game game, ICameraProvider camera, IScreenSource source, float screenSize, float curveRadius)
             : base(game)
         {
+            _source = source;
             _cameraService = camera;
             Visible = true;
             Enabled = true;
-            ScreenSize = 1;
+            ScreenSize = screenSize;
+            CurveRadius = curveRadius;
+
+            DrawOrder = UpdateOrder = RenderingOrder.World;
+
+            game.GameSystems.Add(this);
+            ToDispose(new Disposable(() => game.GameSystems.Remove(this)));
         }
 
         protected override void LoadContent()
         {
             base.LoadContent();
 
-            if (ScreenTexture == null)
+            var screenTexture = ToDisposeContent(_source.GetOutputRenderTexture(GraphicsDevice));
+            var desc = screenTexture.Description;
+
+            // Render mutex is optional (depends on the returned texture)
+            if ((desc.OptionFlags & SharpDX.Direct3D11.ResourceOptionFlags.SharedKeyedmutex) == SharpDX.Direct3D11.ResourceOptionFlags.SharedKeyedmutex)
             {
-                throw new InvalidOperationException("Must create shared texture for screen before LoadContent is called (override LoadContent and call base.LoadContent after creating surface)");
+                _renderMutex = ToDisposeContent(screenTexture.QueryInterface<KeyedMutex>());
+            }
+            else
+            {
+                _renderMutex = null;
             }
 
             _basicEffect = ToDisposeContent(new BasicEffect(GraphicsDevice));
             _basicEffect.TextureEnabled = true;
             _basicEffect.LightingEnabled = false;
 
-            var desc = ScreenTexture.Description;
-            _planeShaderView = ToDisposeContent(new SharpDX.Direct3D11.ShaderResourceView(GraphicsDevice, ScreenTexture, new SharpDX.Direct3D11.ShaderResourceViewDescription
+            _planeShaderView = ToDisposeContent(new SharpDX.Direct3D11.ShaderResourceView(GraphicsDevice, screenTexture, new SharpDX.Direct3D11.ShaderResourceViewDescription
             {
                 Format = desc.Format,
                 Dimension = SharpDX.Direct3D.ShaderResourceViewDimension.Texture2D,
@@ -48,14 +67,15 @@ namespace VirtualSpace.Platform.Windows.Rendering.Screen
 
             if (CurveRadius <= 0.01 || CurveRadius > 100000)
             {
-                _plane = ToDisposeContent(GeometricPrimitive.Plane.New(GraphicsDevice, Width, Height));
+                _plane = ToDisposeContent(GeometricPrimitive.Plane.New(GraphicsDevice, desc.Width, desc.Height));
             }
             else
             {
-                _plane = ToDisposeContent(CreateCurvedSurface(GraphicsDevice, CurveRadius * Width / ScreenSize, Width, Height, 100));
+                _plane = ToDisposeContent(CreateCurvedSurface(GraphicsDevice, CurveRadius * desc.Width / ScreenSize, desc.Width, desc.Height, 100));
             }
 
-            _planeTransform = Matrix.Scaling(ScreenSize / Width); // Make it 6.7m wide...
+            var screenWidth = (float)(ScreenSize * Math.Cos(Math.Atan2(desc.Height, desc.Width)));
+            _planeTransform = Matrix.Scaling(screenWidth / (float)desc.Width);
             _basicEffect.TextureView = _planeShaderView;
             _basicEffect.World = _planeTransform;
         }
@@ -64,6 +84,7 @@ namespace VirtualSpace.Platform.Windows.Rendering.Screen
         {
             base.Update(gameTime);
 
+            _source.Update(gameTime);
             _basicEffect.View = _cameraService.View;
             _basicEffect.Projection = _cameraService.Projection;
         }
@@ -72,14 +93,30 @@ namespace VirtualSpace.Platform.Windows.Rendering.Screen
         {
             base.Draw(gameTime);
 
-            _plane.Draw(_basicEffect);
+            if (_renderMutex == null)
+            {
+                _plane.Draw(_basicEffect);
+            }
+            else
+            {
+                // While drawing make sure we have exlusive access to memory
+                var result = _renderMutex.Acquire(0, 100);
+                if (result != Result.WaitTimeout && result != Result.Ok)
+                {
+                    throw new SharpDXException(result);
+                }
+
+                if (result == Result.Ok)
+                {
+                    _plane.Draw(_basicEffect);
+
+                    _renderMutex.Release(0);
+                }
+            }
         }
 
-        public abstract int Width { get; }
-        public abstract int Height { get; }
         public float ScreenSize { get; set; }
         public float CurveRadius { get; set; }
-        protected abstract SharpDX.Direct3D11.Texture2D ScreenTexture { get; }
 
         private static GeometricPrimitive CreateCurvedSurface(GraphicsDevice device, float distance, float width, float height, int tessellation)
         {

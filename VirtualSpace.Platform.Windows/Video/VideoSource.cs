@@ -11,13 +11,15 @@ using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
 using VirtualSpace.Core;
+using VirtualSpace.Core.Video;
+using VirtualSpace.Platform.Windows.Rendering.Screen;
 
-namespace VirtualSpace.Platform.Windows.Rendering.Video
+namespace VirtualSpace.Platform.Windows.Video
 {
-    internal sealed class VideoSource : IDisposable
+    internal sealed class VideoSource : IVideo, IScreenSource
     {
         private const int MF_SOURCE_READER_FIRST_VIDEO_STREAM = unchecked((int)(0xFFFFFFFC));
-        private const int MaxNumberOfFramesToQueue = 5;
+        private const int MaxNumberOfFramesToQueue = 25;
 
         private readonly List<IDisposable> _toDispose;
         private readonly ManualResetEvent _event;
@@ -31,7 +33,7 @@ namespace VirtualSpace.Platform.Windows.Rendering.Video
 
         private VideoMode _mode;
         private SourceReader _reader;
-        private bool _isPlaying;
+        private VideoState _state;
         private Task _decodeLoop;
         private TimeSpan _currentTime;
         private ManualResetEvent _waitForUnusedFrame;
@@ -40,9 +42,12 @@ namespace VirtualSpace.Platform.Windows.Rendering.Video
         private int _height;
         private Rectangle _pictureRegion;
         private int _stride;
+        private bool _canSeek;
+        private TimeSpan _duration;
+        private bool _isBuffering;
 
-        public int Width { get { return _width; } }
-        public int Height { get { return _height; } }
+        public bool CanSeek { get { return _canSeek; } }
+        public TimeSpan Duration { get { return _duration; } }
 
         public VideoSource(string file)
         {
@@ -73,14 +78,35 @@ namespace VirtualSpace.Platform.Windows.Rendering.Video
                 if (_mode == VideoMode.Software)
                 {
                     // This allows output format of rgb32 when software rendering
-                    // NOTE: This is NOT RECOMMENDED, so I need to find a better way of doing this...
+                    // NOTE: This is NOT RECOMMENDED, so I need to find a better way of doing this... 
+                    // (ie pump Yv12 format into texture and do Yv12 -> rgb conversion in shader)
                     attr.Set(SourceReaderAttributeKeys.EnableVideoProcessing, 1); 
                 }
                 _reader = AddDisposable(new SourceReader(url.AbsoluteUri, attr));
             }
 
             // Set correct video output format (for DX surface)
-            using (var nativeFormat = _reader.GetNativeMediaType(MF_SOURCE_READER_FIRST_VIDEO_STREAM, 0))
+            var supportedTypes = new List<Guid>();
+            while (true)
+            {
+                try
+                {
+                    using (var nativeFormat = _reader.GetNativeMediaType(MF_SOURCE_READER_FIRST_VIDEO_STREAM, supportedTypes.Count))
+                    {
+                        supportedTypes.Add(nativeFormat.Get(MediaTypeAttributeKeys.Subtype));
+                    }
+                }
+                catch (SharpDXException)
+                {
+                    break;
+                }
+            }
+
+            if (supportedTypes.Count == 0)
+            {
+                throw new InvalidOperationException("No output types supported...");
+            }
+
             using (var videoFormat = new MediaType())
             {
                 videoFormat.Set(MediaTypeAttributeKeys.MajorType, MediaTypeGuids.Video);
@@ -103,38 +129,30 @@ namespace VirtualSpace.Platform.Windows.Rendering.Video
                 }
             }
 
-            _isPlaying = true;
-            _waitForUnusedFrame = new ManualResetEvent(true);
-            _decodeLoop = Task.Run(() => DecodeLoop());
+            // Grab out some metadata...
+            _canSeek = GetCanSeek(_reader);
+            _duration = GetDuration(_reader);
+
+            _state = VideoState.Paused;
         }
 
-        public void AttachVideoOutput(SharpDX.Direct3D11.Texture2D output)
+        public SharpDX.Direct3D11.Texture2D GetOutputRenderTexture(SharpDX.Direct3D11.Device device)
         {
-            VideoFrame f;
-            while (_bufferedFrames.TryDequeue(out f))
+            var renderTexture = AddDisposable(new SharpDX.Direct3D11.Texture2D(device, new Texture2DDescription
             {
-                f.Texture.Dispose();
-            }
-            while (_unusedFrames.TryTake(out f))
-            {
-                f.Texture.Dispose();
-            }
+                CpuAccessFlags = CpuAccessFlags.None,
+                BindFlags = BindFlags.ShaderResource,
+                Format = SharpDX.DXGI.Format.B8G8R8A8_UNorm,
+                Height = _height,
+                Width = _width,
+                OptionFlags = ResourceOptionFlags.SharedKeyedmutex,
+                MipLevels = 1,
+                ArraySize = 1,
+                SampleDescription = new SampleDescription(1, 0),
+                Usage = ResourceUsage.Default
+            }));
 
-            if (_surface != null)
-            {
-                _toDispose.Remove(_surface);
-                _surface.Dispose();
-                _surface = null;
-            }
-
-            if (_mutex != null)
-            {
-                _toDispose.Remove(_mutex);
-                _mutex.Dispose();
-                _mutex = null;
-            }
-
-            using (var sharedResource = output.QueryInterface<SharpDX.DXGI.Resource1>())
+            using (var sharedResource = renderTexture.QueryInterface<SharpDX.DXGI.Resource1>())
             {
                 //Get texture to be used by our media engine
                 _surface = AddDisposable(_device.OpenSharedResource<Texture2D>(sharedResource.SharedHandle));
@@ -143,7 +161,7 @@ namespace VirtualSpace.Platform.Windows.Rendering.Video
                 _mutex = AddDisposable(_surface.QueryInterface<KeyedMutex>());
             }
 
-            var desc = output.Description;
+            var desc = renderTexture.Description;
             switch(_mode)
             {
                 case VideoMode.Software:
@@ -165,46 +183,116 @@ namespace VirtualSpace.Platform.Windows.Rendering.Video
 
             // Make sure we let the decoder know we have frames to use!
             _waitForUnusedFrame.Set();
+
+            return renderTexture;
         }
 
         public void Update(GameTime time)
         {
+            if (_state != VideoState.Playing && _state != VideoState.Buffering) { return; }
+
             _currentTime = _currentTime.Add(time.ElapsedGameTime);
             if (_mutex != null && _surface != null && _bufferedFrames.Count > 0)
             {
-                VideoFrame peeked;
-                if (_bufferedFrames.TryPeek(out peeked))
+                VideoFrame peeked = null;
+                VideoFrame dequeued = null;
+                TimeSpan? lastTimestamp = null;
+                while (_bufferedFrames.TryPeek(out peeked) && peeked.Timestamp <= _currentTime)
                 {
-                    if (peeked.Timestamp <= _currentTime && _bufferedFrames.TryDequeue(out peeked))
+                    // We might have to skip frames...
+                    if (dequeued != null)
                     {
-                        var result = _mutex.Acquire(0, 100);
-                        if (result != Result.WaitTimeout && result != Result.Ok)
-                        {
-                            throw new SharpDXException(result);
-                        }
+                        _unusedFrames.Add(dequeued);
+                        _waitForUnusedFrame.Set();
+                        dequeued = null;
+                    }
 
-                        if (result == Result.Ok)
-                        {
-                            _deviceContext.CopyResource(peeked.Texture, _surface);
-                            _mutex.Release(0);
-                        }
+                    lastTimestamp = peeked.Timestamp;
+                    _bufferedFrames.TryDequeue(out dequeued);
+                }
 
-                        _unusedFrames.Add(peeked);
+                if (peeked == null)
+                {
+                    if (lastTimestamp.HasValue)
+                    {
+                        // We have hit the last frame, most likely due to a pause... reset the counter...
+                        _currentTime = lastTimestamp.Value;
+                    }
+                    else
+                    {
+                        // We do not have any buffered, make sure that we are decoding more!
                         _waitForUnusedFrame.Set();
                     }
                 }
-                else
+
+                // We have a frame to update
+                if (dequeued != null)
                 {
-                    // We do not have any buffered, make sure that we are decoding more!
+                    _state = VideoState.Playing;
+
+                    var result = _mutex.Acquire(0, 100);
+                    if (result != Result.WaitTimeout && result != Result.Ok)
+                    {
+                        throw new SharpDXException(result);
+                    }
+
+                    if (result == Result.Ok)
+                    {
+                        _deviceContext.CopyResource(dequeued.Texture, _surface);
+                        _mutex.Release(0);
+                    }
+
+                    _unusedFrames.Add(dequeued);
                     _waitForUnusedFrame.Set();
                 }
+            }
+            else
+            {
+                _state = VideoState.Buffering;
+            }
+
+            if (_bufferedFrames.Count == 0 && !_isBuffering)
+            {
+                _state = VideoState.Finished;
+
+                // Let the decode loop finish
+                _waitForUnusedFrame.Set();
+            }
+        }
+
+        public VideoState State { get { return _state; } }
+
+        public void Play()
+        {
+            if (_decodeLoop == null)
+            {
+                _state = VideoState.Buffering;
+                _waitForUnusedFrame = new ManualResetEvent(true);
+                _decodeLoop = Task.Run(() => DecodeLoop());
+            }
+            else if(_state == VideoState.Paused)
+            {
+                _state = _bufferedFrames.Count > 0 ? VideoState.Playing : VideoState.Buffering;
+            }
+            else if (_state == VideoState.Finished)
+            {
+                throw new NotImplementedException();
+            }
+        }
+
+        public void Stop()
+        {
+            if (_state == VideoState.Buffering || _state == VideoState.Playing)
+            {
+                _state = VideoState.Paused;
             }
         }
 
         private void DecodeLoop()
         {
             _currentTime = TimeSpan.FromMilliseconds(0);
-            while (_isPlaying)
+            _isBuffering = true;
+            while (_state != VideoState.Finished)
             {
                 VideoFrame unused;
                 if (_unusedFrames.TryTake(out unused))
@@ -216,8 +304,8 @@ namespace VirtualSpace.Platform.Windows.Rendering.Video
                     {
                         if (sample == null)
                         {
-                            _isPlaying = false;
                             _unusedFrames.Add(unused);
+                            _isBuffering = false;
                             break;
                         }
 
@@ -225,10 +313,10 @@ namespace VirtualSpace.Platform.Windows.Rendering.Video
                         switch (_mode)
                         {
                             case VideoMode.Dx11:
-                                UpdateTextureDx11(sample, unused.Texture);
+                                QueueSampleDx11(sample, unused.Texture);
                                 break;
                             case VideoMode.Software:
-                                UpdateTextureSoftware(sample, unused.Texture);
+                                QueueSampleSoftware(sample, unused.Texture);
                                 break;
                             default:
                                 _unusedFrames.Add(unused);
@@ -246,7 +334,7 @@ namespace VirtualSpace.Platform.Windows.Rendering.Video
             }
         }
 
-        private void UpdateTextureDx11(Sample sample, Texture2D bufferText)
+        private void QueueSampleDx11(Sample sample, Texture2D bufferText)
         {
             using (var buffer = sample.GetBufferByIndex(0))
             using (var dxgi = buffer.QueryInterface<DXGIBuffer>())
@@ -270,7 +358,7 @@ namespace VirtualSpace.Platform.Windows.Rendering.Video
             }
         }
 
-        private void UpdateTextureSoftware(Sample sample, Texture2D bufferText)
+        private void QueueSampleSoftware(Sample sample, Texture2D bufferText)
         {
             using (var buffer = sample.ConvertToContiguousBuffer())
             {
@@ -293,6 +381,7 @@ namespace VirtualSpace.Platform.Windows.Rendering.Video
                 return dx11Manager;
             }
 
+            // Fallback software device
             _device = AddDisposable(new SharpDX.Direct3D11.Device(DriverType.Hardware, DeviceCreationFlags.BgraSupport));
             _deviceContext = AddDisposable(_device.ImmediateContext);
             _mode = VideoMode.Software;
@@ -352,7 +441,82 @@ namespace VirtualSpace.Platform.Windows.Rendering.Video
             }
         }
 
-        private Rectangle GetPictureRegion(MediaType type)
+        private T AddDisposable<T>(T toDisopse)
+            where T: IDisposable
+        {
+            _toDispose.Add(toDisopse);
+            return toDisopse;
+        }
+
+        public void Dispose()
+        {
+            _state = VideoState.Finished;
+            if (_decodeLoop.Status == TaskStatus.Running)
+            {
+                _waitForUnusedFrame.Set();
+                _decodeLoop.Wait();
+            }
+            _decodeLoop.Dispose();
+            _waitForUnusedFrame.Dispose();
+
+            VideoFrame f;
+            while (_bufferedFrames.TryDequeue(out f))
+            {
+                f.Texture.Dispose();
+            }
+            while (_unusedFrames.TryTake(out f))
+            {
+                f.Texture.Dispose();
+            }
+
+            foreach(var d in _toDispose)
+            {
+                d.Dispose();
+            }
+            _toDispose.Clear();
+
+            GC.SuppressFinalize(this);
+        }
+
+        private enum VideoMode
+        {
+            Software,
+            Dx11
+        }
+
+        private class VideoFrame
+        {
+            public TimeSpan Timestamp { get; set; }
+            public Texture2D Texture { get; set; }
+        }
+
+        private static TimeSpan GetDuration(SourceReader reader)
+        {
+            try
+            {
+                var duration = reader.GetPresentationAttribute(SourceReaderIndex.MediaSource, PresentationDescriptionAttributeKeys.Duration);
+                return TimeSpan.FromMilliseconds(duration / 10000.0);
+            }
+            catch (SharpDXException)
+            {
+                return TimeSpan.Zero;
+            }
+        }
+
+        private static bool GetCanSeek(SourceReader reader)
+        {
+            try
+            {
+                var ch = (MediaSourceCharacteristics)reader.GetPresentationAttribute(SourceReaderIndex.MediaSource, SourceReaderAttributeKeys.MediaSourceCharacteristics);
+                return (ch & MediaSourceCharacteristics.CanSeek) == MediaSourceCharacteristics.CanSeek;
+            }
+            catch (SharpDXException)
+            {
+                return false;
+            }
+        }
+
+        private static Rectangle GetPictureRegion(MediaType type)
         {
             if (type.MajorType != MediaTypeGuids.Video)
             {
@@ -413,7 +577,7 @@ namespace VirtualSpace.Platform.Windows.Rendering.Video
             return new Rectangle();
         }
 
-        private int GetDefaultStride(MediaType type)
+        private static int GetDefaultStride(MediaType type)
         {
             // Try to get the default stride from the media type.
             try
@@ -433,44 +597,7 @@ namespace VirtualSpace.Platform.Windows.Rendering.Video
             return stride;
         }
 
-        private T AddDisposable<T>(T toDisopse)
-            where T: IDisposable
-        {
-            _toDispose.Add(toDisopse);
-            return toDisopse;
-        }
-
-        public void Dispose()
-        {
-            _isPlaying = false;
-            if (_decodeLoop.Status == TaskStatus.Running)
-            {
-                _waitForUnusedFrame.Set();
-                _decodeLoop.Wait();
-            }
-            _decodeLoop.Dispose();
-            _waitForUnusedFrame.Dispose();
-
-            VideoFrame f;
-            while (_bufferedFrames.TryDequeue(out f))
-            {
-                f.Texture.Dispose();
-            }
-            while (_unusedFrames.TryTake(out f))
-            {
-                f.Texture.Dispose();
-            }
-
-            foreach(var d in _toDispose)
-            {
-                d.Dispose();
-            }
-            _toDispose.Clear();
-
-            GC.SuppressFinalize(this);
-        }
-
-        private T ByteArrayToStructure<T>(byte[] bytes) where T : struct
+        private static T ByteArrayToStructure<T>(byte[] bytes) where T : struct
         {
             GCHandle handle = GCHandle.Alloc(bytes, GCHandleType.Pinned);
             T stuff = (T)Marshal.PtrToStructure(handle.AddrOfPinnedObject(), typeof(T));
@@ -478,27 +605,15 @@ namespace VirtualSpace.Platform.Windows.Rendering.Video
             return stuff;
         }
 
-        private int OffsetToInt(Offset offset)
+        private static int OffsetToInt(Offset offset)
         {
             return (int)(offset.Value + (offset.Fract / 65536.0f));
         }
 
-        private void UnpackLong(long a, out int a1, out int a2)
+        private static void UnpackLong(long a, out int a1, out int a2)
         {
             a1 = (int)(a & uint.MaxValue);
             a2 = (int)(a >> 32);
-        }
-
-        private enum VideoMode
-        {
-            Software,
-            Dx11
-        }
-
-        private struct VideoFrame
-        {
-            public TimeSpan Timestamp { get; set; }
-            public Texture2D Texture { get; set; }
         }
     }
 }

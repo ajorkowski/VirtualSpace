@@ -31,6 +31,8 @@ namespace VirtualSpace.Platform.Windows.Rendering
             Visible = true;
             Enabled = true;
 
+            DrawOrder = UpdateOrder = RenderingOrder.Overlay;
+
             game.GameSystems.Add(this);
         }
 

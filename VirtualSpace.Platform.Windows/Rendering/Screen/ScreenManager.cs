@@ -1,4 +1,5 @@
 ﻿using SharpDX.Toolkit;
+using System;
 using VirtualSpace.Core.Renderer.Screen;
 using VirtualSpace.Platform.Windows.Rendering.Providers;
 
@@ -6,27 +7,23 @@ namespace VirtualSpace.Platform.Windows.Rendering.Screen
 {
     internal class ScreenManager : GameSystem, IScreenManager
     {
-        private readonly ScreenRenderer _desktop;
+        private readonly ICameraProvider _camera;
 
         public ScreenManager(Game game, ICameraProvider camera)
             : base(game)
         {
-            Enabled = true;
-            Visible = true;
-
-            //if (Screen.ScreenRendererDX11.IsSupported)
-            //{
-            //    _desktop = ToDispose(new Screen.ScreenRendererDX11(game, camera));
-            //}
-            //else
-            //{
-            //    _desktop = ToDispose(new Screen.ScreenRendererGdi(game, camera));
-            //}
-            _desktop = ToDispose(new Screen.VideoRenderer(game, camera, "C:\\Users\\Public\\Videos\\Sample Videos\\Wildlife.wmv"));//"D:/Movies/The Past aka Le Passe [2013]-720p-BRrip-x264-StyLishSaLH (StyLish Release)/The Past aka Le Passe [2013]-720p-BRrip-x264-StyLishSaLH (StyLish Release).mp4"));
-
-            game.GameSystems.Add(_desktop);
+            _camera = camera;
         }
 
-        public IScreen Desktop { get { return _desktop; } }
+        public IScreen CreateScreen(Core.Renderer.Screen.IScreenSource screenSource, float screenSize, float curveRadius = 0)
+        {
+            var internalSource = screenSource as IScreenSource;
+            if(internalSource == null)
+            {
+                throw new ArgumentException("Not a correctly implemented screen source", "screenSource");
+            }
+
+            return new ScreenRenderer(Game, _camera, internalSource, screenSize, curveRadius);
+        }
     }
 }

@@ -2,6 +2,6 @@
 {
     public interface IScreenManager
     {
-        IScreen Desktop { get; }
+        IScreen CreateScreen(IScreenSource screenSource, float screenSize, float curveRadius = 0);
     }
 }

@@ -2,20 +2,24 @@
 using SharpDX.Direct3D;
 using SharpDX.Direct3D11;
 using SharpDX.DXGI;
+using System;
+using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using System.Threading.Tasks;
-using VirtualSpace.Platform.Windows.Rendering.Providers;
+using VirtualSpace.Core.Desktop;
+using VirtualSpace.Platform.Windows.Rendering.Screen;
 
-namespace VirtualSpace.Platform.Windows.Rendering.Screen
+namespace VirtualSpace.Platform.Windows.Screen
 {
-    internal sealed class ScreenRendererDX11 : ScreenRenderer
+    internal sealed class DesktopDX11 : IDesktop, IScreenSource
     {
         private static readonly int SizeOfMoveRectangle = Marshal.SizeOf(typeof(OutputDuplicateMoveRectangle));
         private static readonly int SizeOfDirtyRectangle = Marshal.SizeOf(typeof(Rectangle));
         private static readonly int SizeOfVertex = Marshal.SizeOf(typeof(SharpDX.Toolkit.Graphics.VertexPositionNormalTexture));
 
+        private readonly List<IDisposable> _toDispose;
+
         private SharpDX.Direct3D11.Texture2D _sharedTexture;
-        private SharpDX.Direct3D11.Texture2D _renderTexture;
 
         private int _nScreenWidth;
         private int _nScreenHeight;
@@ -23,7 +27,6 @@ namespace VirtualSpace.Platform.Windows.Rendering.Screen
         private SharpDX.Direct3D11.Device _captureDevice;
         private OutputDuplication _outputDuplication;
         private KeyedMutex _mutex;
-        private KeyedMutex _renderMutex;
 
         private int _moveBufferLength;
         private OutputDuplicateMoveRectangle[] _moveBuffer;
@@ -68,25 +71,14 @@ namespace VirtualSpace.Platform.Windows.Rendering.Screen
             }
         }
 
-        public ScreenRendererDX11(SharpDX.Toolkit.Game game, ICameraProvider camera)
-            : base(game, camera)
+        public DesktopDX11()
         {
+            _toDispose = new List<IDisposable>();
         }
 
-        public override int Width { get { return _nScreenWidth; } }
-        public override int Height { get { return _nScreenHeight; } }
-        protected override SharpDX.Direct3D11.Texture2D ScreenTexture { get { return _renderTexture; } }
-
-        protected override void LoadContent()
+        public Texture2D GetOutputRenderTexture(SharpDX.Direct3D11.Device device)
         {
-            //Output desktop;
-            var factory = new Factory1();
-            var desktop = factory.Adapters1[0].Outputs[0];
-
-            _nScreenWidth = desktop.Description.DesktopBounds.Width;
-            _nScreenHeight = desktop.Description.DesktopBounds.Height;
-
-            _renderTexture = ToDisposeContent(new SharpDX.Direct3D11.Texture2D(GraphicsDevice, new Texture2DDescription
+            var renderTexture = AddDisposable(new SharpDX.Direct3D11.Texture2D(device, new Texture2DDescription
             {
                 CpuAccessFlags = CpuAccessFlags.None,
                 BindFlags = BindFlags.ShaderResource | BindFlags.RenderTarget,
@@ -100,97 +92,35 @@ namespace VirtualSpace.Platform.Windows.Rendering.Screen
                 Usage = ResourceUsage.Default
             }));
 
-            _renderMutex = ToDisposeContent(_renderTexture.QueryInterface<KeyedMutex>());
-
-            _captureDevice = ToDisposeContent(new SharpDX.Direct3D11.Device(DriverType.Hardware));
-            using (var sharedResource = _renderTexture.QueryInterface<SharpDX.DXGI.Resource1>())
+            //Output desktop;
+            using (var factory = new Factory1())
+            using (var desktop = factory.Adapters1[0].Outputs[0])
             {
-                _sharedTexture = ToDisposeContent(_captureDevice.OpenSharedResource<Texture2D>(sharedResource.SharedHandle));
-            }
+                _nScreenWidth = desktop.Description.DesktopBounds.Width;
+                _nScreenHeight = desktop.Description.DesktopBounds.Height;
 
-            _mutex = ToDisposeContent(_sharedTexture.QueryInterface<KeyedMutex>());
-            using (var output = new Output1(desktop.NativePointer))
-            {
-                _outputDuplication = ToDisposeContent(output.DuplicateOutput(_captureDevice));
+                _captureDevice = AddDisposable(new SharpDX.Direct3D11.Device(DriverType.Hardware));
+                using (var sharedResource = renderTexture.QueryInterface<SharpDX.DXGI.Resource1>())
+                {
+                    _sharedTexture = AddDisposable(_captureDevice.OpenSharedResource<Texture2D>(sharedResource.SharedHandle));
+                }
+
+                _mutex = AddDisposable(_sharedTexture.QueryInterface<KeyedMutex>());
+                using (var output = new Output1(desktop.NativePointer))
+                {
+                    _outputDuplication = AddDisposable(output.DuplicateOutput(_captureDevice));
+                }
             }
 
             _isRunning = true;
             _captureLoop = Task.Run(() => CaptureLoop());
 
-            base.LoadContent();
+            return renderTexture;
         }
 
-        protected override void UnloadContent()
+        public void Update(SharpDX.Toolkit.GameTime gameTime)
         {
-            _isRunning = false;
-            if (_captureLoop != null)
-            {
-                if (_captureLoop.Status == TaskStatus.Running)
-                {
-                    _captureLoop.Wait();
-                }
-                _captureLoop.Dispose();
-                _captureLoop = null;
-            }
-
-            if(_mouseMoveTexture != null)
-            {
-                _mouseMoveTexture.Dispose();
-                _mouseMoveTexture = null;
-            }
-
-            if (_mouseMoveTexture2 != null)
-            {
-                _mouseMoveTexture2.Dispose();
-                _mouseMoveTexture2 = null;
-            }
-
-            base.UnloadContent();
-        }
-
-        public override void Draw(SharpDX.Toolkit.GameTime gameTime)
-        {
-            // We need to make sure the surface is free!
-            var result = _renderMutex.Acquire(0, 100);
-            if (result != Result.WaitTimeout && result != Result.Ok)
-            {
-                throw new SharpDXException(result);
-            }
-
-            if (result == Result.Ok)
-            {
-                base.Draw(gameTime);
-
-                _renderMutex.Release(0);
-            }
-        }
-
-        protected override void Dispose(bool disposeManagedResources)
-        {
-            _isRunning = false;
-            if (_captureLoop != null)
-            {
-                if (_captureLoop.Status == TaskStatus.Running)
-                {
-                    _captureLoop.Wait();
-                }
-                _captureLoop.Dispose();
-                _captureLoop = null;
-            }
-
-            if (_mouseMoveTexture != null)
-            {
-                _mouseMoveTexture.Dispose();
-                _mouseMoveTexture = null;
-            }
-
-            if (_mouseMoveTexture2 != null)
-            {
-                _mouseMoveTexture2.Dispose();
-                _mouseMoveTexture2 = null;
-            }
-
-            base.Dispose(disposeManagedResources);
+            // We do not need to do anything here - we are pumping data straight into the texture
         }
 
         private void CaptureLoop()
@@ -490,6 +420,47 @@ namespace VirtualSpace.Platform.Windows.Rendering.Screen
 
                 mouseSurface.Unmap();
             }
+        }
+
+        private T AddDisposable<T>(T toDisopse)
+            where T : IDisposable
+        {
+            _toDispose.Add(toDisopse);
+            return toDisopse;
+        }
+
+        public void Dispose()
+        {
+            _isRunning = false;
+            if (_captureLoop != null)
+            {
+                if (_captureLoop.Status == TaskStatus.Running)
+                {
+                    _captureLoop.Wait();
+                }
+                _captureLoop.Dispose();
+                _captureLoop = null;
+            }
+
+            if (_mouseMoveTexture != null)
+            {
+                _mouseMoveTexture.Dispose();
+                _mouseMoveTexture = null;
+            }
+
+            if (_mouseMoveTexture2 != null)
+            {
+                _mouseMoveTexture2.Dispose();
+                _mouseMoveTexture2 = null;
+            }
+
+            foreach (var d in _toDispose)
+            {
+                d.Dispose();
+            }
+            _toDispose.Clear();
+
+            GC.SuppressFinalize(this);
         }
     }
 }

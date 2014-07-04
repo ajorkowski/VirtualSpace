@@ -90,6 +90,8 @@ namespace VirtualSpace.Platform.Windows.Rendering
 
         protected override void Dispose(bool disposeManagedResources)
         {
+            _environment.Uninitialise(this);
+
             if (disposeManagedResources)
             {
                 foreach (var gs in GameSystems.ToList())

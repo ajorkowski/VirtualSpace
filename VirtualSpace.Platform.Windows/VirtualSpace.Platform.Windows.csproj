@@ -74,14 +74,16 @@
     <Compile Include="Rendering\Providers\CameraProvider.cs" />
     <Compile Include="Rendering\Providers\ICameraProvider.cs" />
     <Compile Include="Rendering\Providers\KeyboardProvider.cs" />
+    <Compile Include="Rendering\RenderingOrder.cs" />
     <Compile Include="Rendering\SceneRenderer.cs" />
+    <Compile Include="Rendering\Screen\IScreenSource.cs" />
     <Compile Include="Rendering\Screen\ScreenManager.cs" />
     <Compile Include="Rendering\Screen\ScreenRenderer.cs" />
-    <Compile Include="Rendering\Screen\ScreenRendererDX11.cs" />
-    <Compile Include="Rendering\Screen\ScreenRendererGdi.cs" />
-    <Compile Include="Rendering\Screen\VideoRenderer.cs" />
-    <Compile Include="Rendering\Video\VideoSource.cs" />
+    <Compile Include="Desktop\DesktopDX11.cs" />
+    <Compile Include="Desktop\DesktopGdi.cs" />
+    <Compile Include="Video\VideoSource.cs" />
     <Compile Include="Rendering\WindowOutputRenderer.cs" />
+    <Compile Include="ScreenSourceFactory.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />

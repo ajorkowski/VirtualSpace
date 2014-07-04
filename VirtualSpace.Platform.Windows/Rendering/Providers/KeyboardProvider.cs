@@ -12,6 +12,8 @@ namespace VirtualSpace.Platform.Windows.Rendering.Providers
             : base(game)
         {
             _cache = new Dictionary<Keys, SharpDX.Toolkit.Input.ButtonState>();
+
+            DrawOrder = UpdateOrder = RenderingOrder.Provider;
         }
 
         public override void Update(GameTime gameTime)

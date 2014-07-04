@@ -2,53 +2,61 @@
 using SharpDX.Direct3D11;
 using SharpDX.DXGI;
 using System;
+using System.Collections.Generic;
 using System.Runtime.InteropServices;
-using System.Threading;
 using System.Threading.Tasks;
 using VirtualSpace.Core;
-using VirtualSpace.Platform.Windows.Rendering.Providers;
+using VirtualSpace.Core.Desktop;
+using VirtualSpace.Platform.Windows.Rendering.Screen;
 
-namespace VirtualSpace.Platform.Windows.Rendering.Screen
+namespace VirtualSpace.Platform.Windows.Screen
 {
-    internal sealed class ScreenRendererGdi : ScreenRenderer
+    internal sealed class DesktopGdi : IDesktop, IScreenSource
     {
+        private readonly List<IDisposable> _toDispose;
+
         private SharpDX.Direct3D11.Texture2D _gdiTexture;
         private SharpDX.Direct3D11.Texture2D _sharedTexture;
-        private SharpDX.Direct3D11.Texture2D _renderTexture;
 
         private IntPtr _desktopDC;
+        private IntPtr _memDC;
+        private IntPtr _bitmap;
         private int _nScreenWidth;
         private int _nScreenHeight;
 
         private SharpDX.Direct3D11.Device _captureDevice;
         private KeyedMutex _mutex;
-        private KeyedMutex _renderMutex;
 
         private bool _isRunning;
         private Task _captureLoop;
 
-        public ScreenRendererGdi(SharpDX.Toolkit.Game game, ICameraProvider camera)
-            : base(game, camera)
+        public DesktopGdi()
         {
-            _desktopDC = IntPtr.Zero;
+            _toDispose = new List<IDisposable>();
 
-            UpdateOrder = -1;
-        }
-
-        public override int Width { get { return _nScreenWidth; } }
-        public override int Height { get { return _nScreenHeight; } }
-        protected override SharpDX.Direct3D11.Texture2D ScreenTexture { get { return _renderTexture; } }
-
-        protected override void LoadContent()
-        {
             _nScreenWidth = GetSystemMetrics(SystemMetric.SM_CXSCREEN);
             _nScreenHeight = GetSystemMetrics(SystemMetric.SM_CYSCREEN);
 
+            _desktopDC = GetDC(IntPtr.Zero);
+            AddDisposable(new Disposable(() => { ReleaseDC(IntPtr.Zero, _desktopDC); }));
+
+            _memDC = CreateCompatibleDC(_desktopDC);
+            AddDisposable(new Disposable(() => { DeleteObject(_memDC); }));
+
+            _bitmap = CreateCompatibleBitmap(_desktopDC, _nScreenWidth, _nScreenHeight);
+            AddDisposable(new Disposable(() => { DeleteObject(_bitmap); }));
+
+            var handle = SelectObject(_memDC, _bitmap);
+            AddDisposable(new Disposable(() => { DeleteObject(handle); }));
+        }
+
+        public Texture2D GetOutputRenderTexture(SharpDX.Direct3D11.Device device)
+        {
             // Base description
             var sharedDesc = new Texture2DDescription
             {
                 CpuAccessFlags = CpuAccessFlags.None,
-                BindFlags = BindFlags.ShaderResource | BindFlags.RenderTarget,
+                BindFlags = BindFlags.ShaderResource,
                 Format = SharpDX.DXGI.Format.B8G8R8A8_UNorm,
                 Height = _nScreenHeight,
                 Width = _nScreenWidth,
@@ -59,92 +67,75 @@ namespace VirtualSpace.Platform.Windows.Rendering.Screen
                 Usage = ResourceUsage.Default
             };
 
-            _renderTexture = ToDisposeContent(new SharpDX.Direct3D11.Texture2D(GraphicsDevice, sharedDesc));
-            _renderMutex = ToDisposeContent(_renderTexture.QueryInterface<KeyedMutex>());
+            var renderTexture = AddDisposable(new SharpDX.Direct3D11.Texture2D(device, sharedDesc));
 
-            _captureDevice = ToDisposeContent(new SharpDX.Direct3D11.Device(SharpDX.Direct3D.DriverType.Hardware));
-            using (var sharedResource = _renderTexture.QueryInterface<SharpDX.DXGI.Resource1>())
+            _captureDevice = AddDisposable(new SharpDX.Direct3D11.Device(SharpDX.Direct3D.DriverType.Hardware));
+            using (var sharedResource = renderTexture.QueryInterface<SharpDX.DXGI.Resource1>())
             {
-                _sharedTexture = ToDisposeContent(_captureDevice.OpenSharedResource<Texture2D>(sharedResource.SharedHandle));
+                _sharedTexture = AddDisposable(_captureDevice.OpenSharedResource<Texture2D>(sharedResource.SharedHandle));
             }
-            _mutex = ToDisposeContent(_sharedTexture.QueryInterface<KeyedMutex>());
+            _mutex = AddDisposable(_sharedTexture.QueryInterface<KeyedMutex>());
 
             // The shared Gdi textures
-            sharedDesc.OptionFlags = ResourceOptionFlags.GdiCompatible;
-            _gdiTexture = ToDisposeContent(new SharpDX.Direct3D11.Texture2D(_captureDevice, sharedDesc));
-
-            _desktopDC = GetDC(IntPtr.Zero);
-            ToDisposeContent(new Disposable(() => 
-            {
-                if (_desktopDC != IntPtr.Zero)
-                {
-                    ReleaseDC(IntPtr.Zero, _desktopDC);
-                    _desktopDC = IntPtr.Zero;
-                }
-            }));
+            sharedDesc.CpuAccessFlags = CpuAccessFlags.Write;
+            sharedDesc.OptionFlags = ResourceOptionFlags.None;
+            sharedDesc.Usage = ResourceUsage.Dynamic;
+            _gdiTexture = AddDisposable(new SharpDX.Direct3D11.Texture2D(_captureDevice, sharedDesc));
 
             _isRunning = true;
             _captureLoop = Task.Run(() => CaptureLoop());
-            ToDisposeContent(new Disposable(() =>
-            {
-                _isRunning = false;
-                if (_captureLoop != null)
-                {
-                    _captureLoop.Wait();
-                    _captureLoop.Dispose();
-                    _captureLoop = null;
-                }
-            }));
 
-            base.LoadContent();
+            return renderTexture;
         }
 
-        public override void Draw(SharpDX.Toolkit.GameTime gameTime)
+        public void Update(SharpDX.Toolkit.GameTime gameTime)
         {
-            // We need to make sure the surface is free!
-            var result = _renderMutex.Acquire(0, 100);
-            if (result != Result.WaitTimeout && result != Result.Ok)
-            {
-                throw new SharpDXException(result);
-            }
-
-            if (result == Result.Ok)
-            {
-                base.Draw(gameTime);
-
-                _renderMutex.Release(0);
-            }
-        }
-
-        public override void EndDraw()
-        {
-            base.EndDraw();
-
-            // Try and wait till after flip buffers to allow bitblt
-            //_syncEvent.Set();
+            // Do not need to do anything here, we are bitblt to another texture and then transfering to shared texture
         }
 
         private void CaptureLoop()
         {
-            var context = _captureDevice.ImmediateContext;
-            while (_isRunning)
-            {
-                try
-                {
-                    var surface = _gdiTexture.QueryInterface<Surface1>();
-                    var dest = surface.GetDC(false);
+            BITMAPINFO info = new BITMAPINFO();
+            info.bmiHeader.biSize = (uint)Marshal.SizeOf(typeof(BITMAPINFOHEADER));
+            info.bmiHeader.biWidth = _nScreenWidth;
+            info.bmiHeader.biHeight = -_nScreenHeight;
+            info.bmiHeader.biPlanes = 1;
+            info.bmiHeader.biBitCount = 32;
+            info.bmiHeader.biCompression = BitmapCompressionMode.BI_RGB;
+            info.bmiHeader.biSizeImage = 0;
+            info.bmiHeader.biXPelsPerMeter = 0;
+            info.bmiHeader.biYPelsPerMeter = 0;
+            info.bmiHeader.biClrUsed = 0;
+            info.bmiHeader.biClrImportant = 0;
 
-                    BitBlt(dest, 0, 0, _nScreenWidth, _nScreenHeight, _desktopDC, 0, 0, TernaryRasterOperations.SRCCOPY | TernaryRasterOperations.CAPTUREBLT);
+            byte[] data = new byte[((_nScreenWidth * info.bmiHeader.biBitCount + 31) / 32) * 4 * _nScreenHeight];
+
+            using (var context = _captureDevice.ImmediateContext)
+            {
+                while (_isRunning)
+                {
+                    // BitBlt to memory... for some reason grabbing surfaceDC on a texture uses WAY too much memory
+                    BitBlt(_memDC, 0, 0, _nScreenWidth, _nScreenHeight, _desktopDC, 0, 0, TernaryRasterOperations.SRCCOPY | TernaryRasterOperations.CAPTUREBLT);
 
                     // Get mouse info
                     CURSORINFO pci;
                     pci.cbSize = Marshal.SizeOf(typeof(CURSORINFO));
                     GetCursorInfo(out pci);
 
-                    DrawIcon(dest, pci.ptScreenPos.x, pci.ptScreenPos.y, pci.hCursor);
+                    DrawIcon(_memDC, pci.ptScreenPos.x, pci.ptScreenPos.y, pci.hCursor);
 
-                    surface.ReleaseDC();
-                    surface.Dispose();
+                    // Get the bytes...
+                    GetDIBits(_memDC, _bitmap, (uint)0, (uint)_nScreenHeight, data, ref info, DIB_Color_Mode.DIB_RGB_COLORS);
+
+                    // Map data to the shared resource...
+                    GCHandle pinnedArray = GCHandle.Alloc(data, GCHandleType.Pinned);
+                    IntPtr dataPointer = pinnedArray.AddrOfPinnedObject();
+
+                    var box = context.MapSubresource(_gdiTexture, 0, MapMode.WriteDiscard, SharpDX.Direct3D11.MapFlags.None);
+                    Utilities.CopyMemory(box.DataPointer, dataPointer, data.Length);
+                    context.UnmapSubresource(_gdiTexture, 0);
+
+                    pinnedArray.Free();
 
                     var result = _mutex.Acquire(0, 1000);
                     if (result != Result.WaitTimeout && result != Result.Ok)
@@ -158,12 +149,36 @@ namespace VirtualSpace.Platform.Windows.Rendering.Screen
                         _mutex.Release(0);
                     }
                 }
-                catch (AccessViolationException)
-                {
-                    // Sometimes the bitblt is a little too fast...
-                    Thread.Sleep(100);
-                }
             }
+        }
+
+        private T AddDisposable<T>(T toDisopse)
+            where T : IDisposable
+        {
+            _toDispose.Add(toDisopse);
+            return toDisopse;
+        }
+
+        public void Dispose()
+        {
+            _isRunning = false;
+            if (_captureLoop != null)
+            {
+                if (_captureLoop.Status == TaskStatus.Running)
+                {
+                    _captureLoop.Wait();
+                }
+                _captureLoop.Dispose();
+                _captureLoop = null;
+            }
+
+            foreach (var d in _toDispose)
+            {
+                d.Dispose();
+            }
+            _toDispose.Clear();
+
+            GC.SuppressFinalize(this);
         }
 
         [DllImport("user32.dll", SetLastError = true)]
@@ -205,6 +220,82 @@ namespace VirtualSpace.Platform.Windows.Rendering.Screen
         [DllImport("gdi32.dll", EntryPoint = "BitBlt", SetLastError = true)]
         [return: MarshalAs(UnmanagedType.Bool)]
         private static extern bool BitBlt([In] IntPtr hdc, int nXDest, int nYDest, int nWidth, int nHeight, [In] IntPtr hdcSrc, int nXSrc, int nYSrc, TernaryRasterOperations dwRop);
+
+        [DllImport("gdi32.dll", EntryPoint = "CreateCompatibleDC", SetLastError = true)]
+        private static extern IntPtr CreateCompatibleDC([In] IntPtr hdc);
+
+        [DllImport("gdi32.dll", EntryPoint = "CreateCompatibleBitmap")]
+        private static extern IntPtr CreateCompatibleBitmap([In] IntPtr hdc, int nWidth, int nHeight);
+
+        [DllImport("gdi32.dll", EntryPoint = "SelectObject", SetLastError = true)]
+        private static extern IntPtr SelectObject([In] IntPtr hdc, [In] IntPtr hgdiobj);
+
+        [DllImport("gdi32.dll", EntryPoint = "DeleteObject")]
+        private static extern bool DeleteObject([In] IntPtr hObject);
+
+        [DllImport("gdi32.dll", EntryPoint = "GetDIBits")]
+        private static extern int GetDIBits([In] IntPtr hdc, [In] IntPtr hbmp, uint uStartScan, uint cScanLines, [Out] byte[] lpvBits, ref BITMAPINFO lpbi, DIB_Color_Mode uUsage);
+
+        [StructLayoutAttribute(LayoutKind.Sequential)]
+        private struct BITMAPINFO
+        {
+            /// <summary>
+            /// A BITMAPINFOHEADER structure that contains information about the dimensions of color format.
+            /// </summary>
+            public BITMAPINFOHEADER bmiHeader;
+
+            /// <summary>
+            /// An array of RGBQUAD. The elements of the array that make up the color table.
+            /// </summary>
+            [MarshalAsAttribute(UnmanagedType.ByValArray, SizeConst = 1, ArraySubType = UnmanagedType.Struct)]
+            public RGBQUAD[] bmiColors;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct RGBQUAD
+        {
+            public byte rgbBlue;
+            public byte rgbGreen;
+            public byte rgbRed;
+            public byte rgbReserved;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct BITMAPINFOHEADER
+        {
+            public uint biSize;
+            public int biWidth;
+            public int biHeight;
+            public ushort biPlanes;
+            public ushort biBitCount;
+            public BitmapCompressionMode biCompression;
+            public uint biSizeImage;
+            public int biXPelsPerMeter;
+            public int biYPelsPerMeter;
+            public uint biClrUsed;
+            public uint biClrImportant;
+
+            public void Init()
+            {
+                biSize = (uint)Marshal.SizeOf(this);
+            }
+        }
+
+        private enum DIB_Color_Mode : uint
+        {
+            DIB_RGB_COLORS = 0,
+            DIB_PAL_COLORS = 1
+        }
+
+        private enum BitmapCompressionMode : uint
+        {
+            BI_RGB = 0,
+            BI_RLE8 = 1,
+            BI_RLE4 = 2,
+            BI_BITFIELDS = 3,
+            BI_JPEG = 4,
+            BI_PNG = 5
+        }
 
         private enum SystemMetric
         {

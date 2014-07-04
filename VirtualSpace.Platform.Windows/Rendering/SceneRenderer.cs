@@ -24,6 +24,8 @@ namespace VirtualSpace.Platform.Windows.Rendering
 
             _cameraService = camera;
 
+            DrawOrder = UpdateOrder = RenderingOrder.World;
+
             game.GameSystems.Add(this);
         }
 

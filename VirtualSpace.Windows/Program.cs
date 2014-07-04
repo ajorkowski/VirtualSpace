@@ -1,5 +1,7 @@
-﻿using System;
+﻿using PCLStorage;
+using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Reflection;
 using TinyIoC;
 using VirtualSpace.Core;
@@ -18,6 +20,8 @@ namespace VirtualSpace.Window
                 typeof(IEnvironment).Assembly,
                 typeof(WindowOutputDevice).Assembly
             }, true);
+
+            TinyIoCContainer.Current.Register<IFolder>(new FileSystemFolder(Path.Combine(Directory.GetCurrentDirectory(), "Content"), false));
 
             var app = TinyIoCContainer.Current.Resolve<IApplication>();
             app.Run();

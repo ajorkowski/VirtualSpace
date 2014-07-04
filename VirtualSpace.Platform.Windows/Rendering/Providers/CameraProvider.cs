@@ -15,6 +15,8 @@ namespace VirtualSpace.Platform.Windows.Rendering.Providers
             Enabled = true;
             Visible = false;
 
+            DrawOrder = UpdateOrder = RenderingOrder.Provider;
+
             game.GameSystems.Add(this);
         }
 

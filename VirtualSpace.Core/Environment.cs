@@ -1,17 +1,36 @@
-﻿using System;
+﻿using PCLStorage;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
 using VirtualSpace.Core.Device;
 using VirtualSpace.Core.Renderer;
+using VirtualSpace.Core.Renderer.Screen;
+using VirtualSpace.Core.Video;
 
 namespace VirtualSpace.Core
 {
-    public class Environment : IEnvironment
+    public sealed class Environment : IEnvironment, IDisposable
     {
         private IInput _input;
         private IRenderer _renderer;
+        private IScreenSourceFactory _screenFactory;
 
-        public Environment()
+        private IVideo _videoSource;
+        private IScreen _currentScreen;
+
+        private List<string> _videos;
+        private int _currentVideo;
+
+        public Environment(IScreenSourceFactory screenFactory, IFolder folder)
         {
             VSync = true;
+            _screenFactory = screenFactory;
+
+            _videos = new List<string>();
+            _currentVideo = 0;
+
+            Task.Run(() => FindVideos(folder));
         }
 
         public void Initialise(IRenderer renderer, IInput input)
@@ -20,12 +39,53 @@ namespace VirtualSpace.Core
             _renderer = renderer;
             _renderer.Camera.MoveTo(0, 0, 20);
             _renderer.Camera.LookAt(0, 0, 0);
-            _renderer.ScreenManager.Desktop.ScreenSize = 17.2f;
-            _renderer.ScreenManager.Desktop.CurveRadius = 17.2f;
+        }
+
+        public void Uninitialise(IRenderer renderer)
+        {
+            if (_currentScreen != null)
+            {
+                _currentScreen.Dispose();
+                _currentScreen = null;
+            }
+
+            if (_videoSource != null)
+            {
+                _videoSource.Dispose();
+                _videoSource = null;
+            }
         }
 
         public void Update(IRenderer renderer, TimeSpan totalGameTime, TimeSpan elapsedGameTime, bool isRunningSlowly)
         {
+            if (_videoSource != null && _videoSource.State == VideoState.Finished)
+            {
+                _currentScreen.Dispose();
+                _videoSource.Dispose();
+
+                _videoSource = null;
+                _currentScreen = null;
+            }
+
+            if (_videoSource == null && _videos.Count > 0)
+            {
+                if (_currentVideo >= _videos.Count)
+                {
+                    _currentVideo = 0;
+                }
+
+                _videoSource = _screenFactory.OpenVideo(_videos[_currentVideo]);
+                //_currentSource = _screenFactory.OpenPrimaryDesktop();
+                _currentScreen = _renderer.ScreenManager.CreateScreen(_videoSource, 17.2f, 17.2f);
+
+                _currentVideo++;
+            }
+
+            if (_videoSource != null && _videoSource.State == VideoState.Paused)
+            {
+                _videoSource.Play();
+            }
+
             MoveCamera(elapsedGameTime);
 
 #if DEBUG
@@ -100,6 +160,35 @@ namespace VirtualSpace.Core
             if (xRot != 0 || yRot != 0)
             {
                 _renderer.Camera.RotateRelative(xRot, yRot, 0);
+            }
+        }
+
+        private async Task FindVideos(IFolder folder)
+        {
+            try
+            {
+                var fold = await folder.GetFolderAsync("Videos");
+                var files = await fold.GetFilesAsync();
+                _videos.AddRange(files.Select(f => f.Path));
+            }
+            catch (Exception e)
+            {
+                var test = e;
+            }
+        }
+
+        public void Dispose()
+        {
+            if (_currentScreen != null)
+            {
+                _currentScreen.Dispose();
+                _currentScreen = null;
+            }
+
+            if (_videoSource != null)
+            {
+                _videoSource.Dispose();
+                _videoSource = null;
             }
         }
     }

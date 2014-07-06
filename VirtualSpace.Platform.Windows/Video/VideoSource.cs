@@ -1,4 +1,5 @@
-﻿using SharpDX;
+﻿using MkvDecoder.Interop;
+using SharpDX;
 using SharpDX.Direct3D;
 using SharpDX.Direct3D11;
 using SharpDX.DXGI;
@@ -58,6 +59,7 @@ namespace VirtualSpace.Platform.Windows.Video
 
             // Initialize MediaFoundation
             MediaManager.Startup();
+            MkvDecoderRegister.Register();
             AddDisposable(new Disposable(() => MediaManager.Shutdown()));
 
             // Creates an URL to the file
@@ -182,7 +184,10 @@ namespace VirtualSpace.Platform.Windows.Video
             }
 
             // Make sure we let the decoder know we have frames to use!
-            _waitForUnusedFrame.Set();
+            if (_waitForUnusedFrame != null)
+            {
+                _waitForUnusedFrame.Set();
+            }
 
             return renderTexture;
         }
@@ -230,16 +235,19 @@ namespace VirtualSpace.Platform.Windows.Video
                 {
                     _state = VideoState.Playing;
 
-                    var result = _mutex.Acquire(0, 100);
-                    if (result != Result.WaitTimeout && result != Result.Ok)
+                    try
                     {
-                        throw new SharpDXException(result);
-                    }
+                        var result = _mutex.Acquire(0, 100);
 
-                    if (result == Result.Ok)
+                        if (result == Result.Ok)
+                        {
+                            _deviceContext.CopyResource(dequeued.Texture, _surface);
+                            _mutex.Release(0);
+                        }
+                    }
+                    catch(SharpDXException)
                     {
-                        _deviceContext.CopyResource(dequeued.Texture, _surface);
-                        _mutex.Release(0);
+                        // TODO: Might need to handle certain types of errors better?
                     }
 
                     _unusedFrames.Add(dequeued);
@@ -343,16 +351,19 @@ namespace VirtualSpace.Platform.Windows.Video
                 dxgi.GetResource(typeof(SharpDX.Direct3D11.Texture2D).GUID, out texture2d);
                 using (var tex = new SharpDX.Direct3D11.Texture2D(texture2d))
                 {
-                    var result = _mutex.Acquire(0, 100);
-                    if (result != Result.WaitTimeout && result != Result.Ok)
+                    try
                     {
-                        throw new SharpDXException(result);
-                    }
+                        var result = _mutex.Acquire(0, 100);
 
-                    if (result == Result.Ok)
+                        if (result == Result.Ok)
+                        {
+                            _deviceContext.CopyResource(tex, bufferText);
+                            _mutex.Release(0);
+                        }
+                    }
+                    catch(SharpDXException)
                     {
-                        _deviceContext.CopyResource(tex, bufferText);
-                        _mutex.Release(0);
+                        // TODO: Maybe do not ignore this?
                     }
                 }
             }

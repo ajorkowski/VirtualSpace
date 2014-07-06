@@ -89,6 +89,10 @@
     <None Include="packages.config" />
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\MkvDecoder.Interop\MkvDecoder.Interop.csproj">
+      <Project>{553b3a6b-0114-4a40-a278-a507b51253e0}</Project>
+      <Name>MkvDecoder.Interop</Name>
+    </ProjectReference>
     <ProjectReference Include="..\VirtualSpace.Core\VirtualSpace.Core.csproj">
       <Project>{ffe24297-c6fe-43f5-a9cc-56807405364d}</Project>
       <Name>VirtualSpace.Core</Name>

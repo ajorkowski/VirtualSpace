@@ -1,11 +1,11 @@
 ﻿using MediaFoundation;
-using System;
 using System.Runtime.InteropServices;
 using System.Security;
+using VideoDecoders.MediaFoundation.Mkv;
 
-namespace MkvDecoder.Interop
+namespace VideoDecoders.MediaFoundation
 {
-    public static class MkvDecoderRegister
+    public static class DecoderRegister
     {
         public static void Register()
         {

@@ -169,7 +169,7 @@ namespace VirtualSpace.Core
             {
                 var fold = await folder.GetFolderAsync("Videos");
                 var files = await fold.GetFilesAsync();
-                _videos.AddRange(files.Select(f => f.Path));
+                _videos.AddRange(files.Select(f => f.Path).Where(n => n.EndsWith(".mkv")));
             }
             catch (Exception e)
             {

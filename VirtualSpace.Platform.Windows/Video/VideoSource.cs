@@ -1,5 +1,4 @@
-﻿using MkvDecoder.Interop;
-using SharpDX;
+﻿using SharpDX;
 using SharpDX.Direct3D;
 using SharpDX.Direct3D11;
 using SharpDX.DXGI;
@@ -11,6 +10,7 @@ using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
+using VideoDecoders.MediaFoundation;
 using VirtualSpace.Core;
 using VirtualSpace.Core.Video;
 using VirtualSpace.Platform.Windows.Rendering.Screen;
@@ -59,7 +59,7 @@ namespace VirtualSpace.Platform.Windows.Video
 
             // Initialize MediaFoundation
             MediaManager.Startup();
-            MkvDecoderRegister.Register();
+            DecoderRegister.Register();
             AddDisposable(new Disposable(() => MediaManager.Shutdown()));
 
             // Creates an URL to the file

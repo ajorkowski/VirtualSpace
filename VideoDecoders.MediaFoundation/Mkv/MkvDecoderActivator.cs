@@ -4,7 +4,7 @@ using System;
 using System.Runtime.InteropServices;
 using System.Text;
 
-namespace MkvDecoder.Interop
+namespace VideoDecoders.MediaFoundation.Mkv
 {
     [ComVisible(true)]
     [Guid("3FD9C8B1-33C2-434D-9193-61B08D39B620")]

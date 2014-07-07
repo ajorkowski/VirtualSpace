@@ -10,19 +10,37 @@ namespace VideoDecoders.MediaFoundation.Mkv
     {
         private readonly EbmlReader _reader;
         private readonly MatroskaElementDescriptorProvider _medp;
-        private readonly Lazy<MkvMetadata> _metadata;
+        private readonly MkvMetadata _metadata;
         private readonly StreamMetadata _streamMetadata;
+
+        private bool _hasStarted;
+        private bool _hasFinished;
 
         public MkvDecoder(Stream stream, StreamMetadata streamMetadata)
         {
             _reader = new EbmlReader(stream);
             _medp = new MatroskaElementDescriptorProvider();
-            _metadata = new Lazy<MkvMetadata>(GetMetadata);
+            _metadata = GetMetadata();
             _streamMetadata = streamMetadata;
         }
 
-        public MkvMetadata Metadata { get { return _metadata.Value; } }
+        public MkvMetadata Metadata { get { return _metadata; } }
         public StreamMetadata StreamMetadata { get { return _streamMetadata; } }
+
+        private void GetNextBlock()
+        {
+            if(_hasFinished)
+            {
+                return; //null;
+            }
+
+            if(!_hasStarted)
+            {
+                _reader.LocateElement(MatroskaElementDescriptorProvider.Cluster);
+                _reader.EnterContainer();
+                _hasStarted = true;
+            }
+        }
 
         private MkvMetadata GetMetadata()
         {

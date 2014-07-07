@@ -1,4 +1,5 @@
 ﻿using MediaFoundation;
+using MediaFoundation.Misc;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -11,7 +12,7 @@ namespace VideoDecoders.MediaFoundation.Mkv
     {
         public MkvState State { get; set; }
         public IMFPresentationDescriptor Descriptor { get; set; }
-
+        public ConstPropVariant Prop { get; set; }
     }
 
     public enum MkvState

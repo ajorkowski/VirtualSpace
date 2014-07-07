@@ -6,5 +6,7 @@ namespace VideoDecoders.MediaFoundation.Mkv
     {
         TrackEntry Metadata { get; }
         IMFStreamDescriptor Descriptor { get; }
+
+        bool HasStarted { get; set; }
     }
 }

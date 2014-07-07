@@ -462,6 +462,7 @@ namespace VirtualSpace.Platform.Windows.Video
         public void Dispose()
         {
             _state = VideoState.Finished;
+            _reader.Dispose();
             if (_decodeLoop.Status == TaskStatus.Running)
             {
                 _waitForUnusedFrame.Set();

@@ -16,8 +16,8 @@ namespace VideoDecoders.MediaFoundation.Mkv
     {
         private readonly MkvDecoder _decoder;
         private readonly List<IMkvTrack> _tracks;
-        private readonly IMFMediaEventQueue _eventQueue;
         private readonly ConcurrentQueue<MkvStateCommand> _commands;
+        private readonly IMFMediaEventQueue _eventQueue;
         private readonly ManualResetEvent _commandReset;
         private readonly Task _commandProcess;
 
@@ -63,14 +63,14 @@ namespace VideoDecoders.MediaFoundation.Mkv
             return S_Ok;
         }
 
-        public int Start(IMFPresentationDescriptor pPresentationDescriptor, Guid pguidTimeFormat, global::MediaFoundation.Misc.ConstPropVariant pvarStartPosition)
+        public int Start(IMFPresentationDescriptor pPresentationDescriptor, Guid pguidTimeFormat, ConstPropVariant pvarStartPosition)
         {
             if (_currentState == MkvState.Shutdown)
             {
                 throw new ObjectDisposedException("MkvMediaSource");
             }
 
-            SetEvent(new MkvStateCommand { State = MkvState.Play, Descriptor = pPresentationDescriptor });
+            SetEvent(new MkvStateCommand { State = MkvState.Play, Descriptor = pPresentationDescriptor, Prop = pvarStartPosition });
             return S_Ok;
         }
 
@@ -105,7 +105,7 @@ namespace VideoDecoders.MediaFoundation.Mkv
             _commandProcess.Dispose();
             _commandReset.Dispose();
 
-            return S_Ok;
+            return _eventQueue.Shutdown();
         }
 
         public int BeginGetEvent(IMFAsyncCallback pCallback, object o)
@@ -165,18 +165,41 @@ namespace VideoDecoders.MediaFoundation.Mkv
                 {
                     switch (command.State)
                     {
+                        case MkvState.Play:
+                            OnStart();
+                            break;
                         case MkvState.Shutdown:
                             _currentState = MkvState.Shutdown;
                             isRunning = false;
                             break;
+                        default:
+                            throw new InvalidOperationException("Unsupported state");
                     }
+                    continue;
                 }
-                else
+
+                if(_currentState == MkvState.Play)
                 {
-                    _commandReset.Reset();
-                    _commandReset.WaitOne();
+                    LoadNextFrame();
                 }
+
+                // We are stopped pretty much... we have nothing to do... so just wait instead of wasting cycles
+                _commandReset.Reset();
+                _commandReset.WaitOne();
             }
+        }
+
+        private void OnStart()
+        {
+            if (_currentState == MkvState.Play) { return; }
+            QueueEvent(MediaEventType.MESourceStarted, Guid.Empty, S_Ok, new PropVariant());
+
+            _currentState = MkvState.Play;
+        }
+
+        private void LoadNextFrame()
+        {
+            
         }
 
         private void TestSuccess(string message, int hResult)

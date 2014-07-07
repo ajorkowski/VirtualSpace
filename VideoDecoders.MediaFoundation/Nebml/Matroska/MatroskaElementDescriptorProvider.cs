@@ -11,6 +11,7 @@ namespace NEbml.MkvTitleEdit.Matroska
 
 		public static readonly ElementDescriptor Segment = new ElementDescriptor(0x18538067, "Segment", ElementType.MasterElement);
 		public static readonly ElementDescriptor SegmentInfo = new ElementDescriptor(0x1549a966, "Info", ElementType.MasterElement);
+        public static readonly ElementDescriptor Cluster = new ElementDescriptor(0x1f43b675, "Cluster", ElementType.MasterElement);
 		public static readonly ElementDescriptor Title = new ElementDescriptor(0x7ba9, "Title", ElementType.Utf8String);
 		public static readonly ElementDescriptor MuxingApp = new ElementDescriptor(0x4d80, "MuxingApp", ElementType.Utf8String);
 		public static readonly ElementDescriptor WritingApp = new ElementDescriptor(0x5741, "WritingApp", ElementType.Utf8String);
@@ -45,7 +46,7 @@ namespace NEbml.MkvTitleEdit.Matroska
 			MuxingApp,
 			WritingApp,
 
-			new ElementDescriptor(0x1f43b675, "Cluster", ElementType.MasterElement),
+			Cluster,
 			new ElementDescriptor(0xe7, "Timecode", ElementType.UnsignedInteger),
 			new ElementDescriptor(0x5854, "SilentTracks", ElementType.MasterElement),
 			new ElementDescriptor(0x58d7, "SilentTrackNumber", ElementType.UnsignedInteger),

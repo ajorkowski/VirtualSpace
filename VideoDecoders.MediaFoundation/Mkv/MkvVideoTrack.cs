@@ -1,11 +1,6 @@
 ﻿using MediaFoundation;
 using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Runtime.InteropServices;
-using System.Security;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace VideoDecoders.MediaFoundation.Mkv
 {
@@ -16,6 +11,7 @@ namespace VideoDecoders.MediaFoundation.Mkv
 
         public IMFStreamDescriptor Descriptor { get { return _descriptor; } }
         public TrackEntry Metadata { get { return _entry; } }
+        public bool HasStarted { get; set; }
 
         public MkvVideoTrack(TrackEntry entry)
         {

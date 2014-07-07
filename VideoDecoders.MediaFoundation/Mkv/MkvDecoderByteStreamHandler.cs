@@ -2,8 +2,7 @@
 using MediaFoundation.Misc;
 using System;
 using System.Runtime.InteropServices;
-using System.Text;
-using System.Threading;
+using System.Threading.Tasks;
 
 namespace VideoDecoders.MediaFoundation.Mkv
 {
@@ -18,13 +17,16 @@ namespace VideoDecoders.MediaFoundation.Mkv
                 throw new InvalidOperationException("Only can use this byte stream handler to get a media source");
             }
 
-            var wrapperStream = new IMFByteStreamWrapper(pByteStream);
-            var decoder = new MkvDecoder(wrapperStream, wrapperStream.Metadata);
-            var mediaSource = new MkvMediaSource(decoder);
+            Task.Run(() =>
+            {
+                var wrapperStream = new IMFByteStreamWrapper(pByteStream);
+                var decoder = new MkvDecoder(wrapperStream, wrapperStream.Metadata);
+                var mediaSource = new MkvMediaSource(decoder);
 
-            IMFAsyncResult result;
-            MFExtern.MFCreateAsyncResult(mediaSource, pCallback, pUnkState, out result);
-            MFExtern.MFInvokeCallback(result);
+                IMFAsyncResult result;
+                TestSuccess("Could not create async result", MFExtern.MFCreateAsyncResult(mediaSource, pCallback, pUnkState, out result));
+                TestSuccess("Could not invoke callback", MFExtern.MFInvokeCallback(result));
+            });
 
             ppIUnknownCancelCookie = null;
             return S_Ok;
@@ -32,7 +34,7 @@ namespace VideoDecoders.MediaFoundation.Mkv
 
         public int EndCreateObject(IMFAsyncResult pResult, out MFObjectType pObjectType, out object ppObject)
         {
-            pResult.GetObject(out ppObject);
+            TestSuccess("Could not get callback object", pResult.GetObject(out ppObject));
             pObjectType = MFObjectType.MediaSource;
             return S_Ok;
         }
@@ -46,6 +48,14 @@ namespace VideoDecoders.MediaFoundation.Mkv
         {
             pqwBytes = long.MaxValue;
             return S_Ok;
+        }
+
+        private void TestSuccess(string message, int hResult)
+        {
+            if (hResult < 0)
+            {
+                throw new COMException(message, hResult);
+            }
         }
     }
 }

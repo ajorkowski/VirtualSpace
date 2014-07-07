@@ -47,12 +47,15 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="IMFByteStreamWrapper.cs" />
+    <Compile Include="Mkv\IMkvTrack.cs" />
     <Compile Include="Mkv\MkvDecoder.cs" />
     <Compile Include="Mkv\MkvDecoderActivator.cs" />
     <Compile Include="Mkv\MkvDecoderByteStreamHandler.cs" />
     <Compile Include="DecoderRegister.cs" />
     <Compile Include="Mkv\MkvMediaSource.cs" />
     <Compile Include="Mkv\MkvMetadata.cs" />
+    <Compile Include="Mkv\MkvStateCommand.cs" />
+    <Compile Include="Mkv\MkvVideoTrack.cs" />
     <Compile Include="Nebml\Core\CompositeElementDescriptorProvider.cs" />
     <Compile Include="Nebml\Core\DefaultElementDescriptorProvider.cs" />
     <Compile Include="Nebml\Core\EbmlDataFormatException.cs" />
@@ -75,7 +78,7 @@
   <ItemGroup />
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <PropertyGroup>
-    <PostBuildEvent>"%25Windir%25\Microsoft.NET\Framework\v4.0.30319\regasm" /codebase /tlb "$(MSBuildProjectDirectory)\$(OutputPath)$(AssemblyName).dll"</PostBuildEvent>
+    <PostBuildEvent>"%25Windir%25\Microsoft.NET\Framework\v4.0.30319\regasm" /codebase "$(MSBuildProjectDirectory)\$(OutputPath)$(AssemblyName).dll" /tlb</PostBuildEvent>
   </PropertyGroup>
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
        Other similar extension points exist, see Microsoft.Common.targets.

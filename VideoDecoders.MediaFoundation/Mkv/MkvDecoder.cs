@@ -18,6 +18,7 @@ namespace VideoDecoders.MediaFoundation.Mkv
             _reader = new EbmlReader(stream);
             _medp = new MatroskaElementDescriptorProvider();
             _metadata = new Lazy<MkvMetadata>(GetMetadata);
+            _streamMetadata = streamMetadata;
         }
 
         public MkvMetadata Metadata { get { return _metadata.Value; } }

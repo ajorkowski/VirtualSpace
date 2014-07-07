@@ -16,7 +16,7 @@ namespace VideoDecoders.MediaFoundation
             _byteStream = byteStream;
             TestSuccess("Could not read byte stream capabilities", _byteStream.GetCapabilities(out _capabilities));
 
-            new StreamMetadata
+            _metadata = new StreamMetadata
             {
                 CanPause = true,
                 CanSeek = _capabilities.HasFlag(MFByteStreamCapabilities.IsSeekable),

@@ -16,12 +16,15 @@ namespace VideoDecoders.MediaFoundation.Mkv
     {
         private readonly MkvDecoder _decoder;
         private readonly List<IMkvTrack> _tracks;
+        private readonly IMFPresentationDescriptor _descriptor;
         private readonly ConcurrentQueue<MkvStateCommand> _commands;
         private readonly IMFMediaEventQueue _eventQueue;
         private readonly ManualResetEvent _commandReset;
         private readonly Task _commandProcess;
 
         private MkvState _currentState;
+
+        public MkvState CurrentState { get { return _currentState; } }
 
         public MkvMediaSource(MkvDecoder decoder)
         {
@@ -35,7 +38,23 @@ namespace VideoDecoders.MediaFoundation.Mkv
             {
                 if (t.TrackType == TrackType.Video)
                 {
-                    _tracks.Add(new MkvVideoTrack(t));
+                    var newTrack = new MkvVideoTrack(t, this);
+                    _tracks.Add(newTrack);
+                }
+            }
+
+            TestSuccess("Could not create presentation descriptor", MFExtern.MFCreatePresentationDescriptor(_tracks.Count, _tracks.Select(t => t.Descriptor).ToArray(), out _descriptor));
+
+            for (int i = 0; i < _tracks.Count; i++)
+            {
+                var t = _tracks[i];
+                if (t.Metadata.FlagDefault)
+                {
+                    TestSuccess("Could not select track for presentation", _descriptor.SelectStream(i));
+                }
+                else
+                {
+                    TestSuccess("Could not deselect track for presentation", _descriptor.DeselectStream(i));
                 }
             }
 
@@ -45,30 +64,15 @@ namespace VideoDecoders.MediaFoundation.Mkv
 
         public int CreatePresentationDescriptor(out IMFPresentationDescriptor ppPresentationDescriptor)
         {
-            TestSuccess("Could not create presentation descriptor", MFExtern.MFCreatePresentationDescriptor(_tracks.Count, _tracks.Select(t => t.Descriptor).ToArray(), out ppPresentationDescriptor));
-
-            for (int i = 0; i < _tracks.Count; i++)
-            {
-                var t = _tracks[i];
-                if (t.Metadata.FlagDefault)
-                {
-                    TestSuccess("Could not select track for presentation", ppPresentationDescriptor.SelectStream(i));
-                }
-                else
-                {
-                    TestSuccess("Could not deselect track for presentation", ppPresentationDescriptor.DeselectStream(i));
-                }
-            }
-
-            return S_Ok;
+            // Recommended that this should clone...
+            return _descriptor.Clone(out ppPresentationDescriptor);
         }
 
         public int Start(IMFPresentationDescriptor pPresentationDescriptor, Guid pguidTimeFormat, ConstPropVariant pvarStartPosition)
         {
-            if (_currentState == MkvState.Shutdown)
-            {
-                throw new ObjectDisposedException("MkvMediaSource");
-            }
+            if (_currentState == MkvState.Shutdown) { return MFError.MF_E_SHUTDOWN; }
+            if (pguidTimeFormat != Guid.Empty) { return MFError.MF_E_UNSUPPORTED_TIME_FORMAT; }
+            if (pvarStartPosition.GetVariantType() != ConstPropVariant.VariantType.None) { return MFError.MF_E_INVALIDREQUEST; }
 
             SetEvent(new MkvStateCommand { State = MkvState.Play, Descriptor = pPresentationDescriptor, Prop = pvarStartPosition });
             return S_Ok;
@@ -76,10 +80,7 @@ namespace VideoDecoders.MediaFoundation.Mkv
 
         public int Stop()
         {
-            if (_currentState == MkvState.Shutdown)
-            {
-                throw new ObjectDisposedException("MkvMediaSource");
-            }
+            if (_currentState == MkvState.Shutdown) { return MFError.MF_E_SHUTDOWN; }
 
             SetEvent(new MkvStateCommand { State = MkvState.Stop });
             return S_Ok;
@@ -87,10 +88,7 @@ namespace VideoDecoders.MediaFoundation.Mkv
 
         public int Pause()
         {
-            if (_currentState == MkvState.Shutdown)
-            {
-                throw new ObjectDisposedException("MkvMediaSource");
-            }
+            if (_currentState == MkvState.Shutdown) { return MFError.MF_E_SHUTDOWN; }
 
             SetEvent(new MkvStateCommand { State = MkvState.Pause });
             return S_Ok;
@@ -98,6 +96,8 @@ namespace VideoDecoders.MediaFoundation.Mkv
 
         public int Shutdown()
         {
+            if (_currentState == MkvState.Shutdown) { return MFError.MF_E_SHUTDOWN; }
+
             MkvStateCommand command;
             while (_commands.TryDequeue(out command)) ;
             SetEvent(new MkvStateCommand { State = MkvState.Shutdown });
@@ -166,7 +166,7 @@ namespace VideoDecoders.MediaFoundation.Mkv
                     switch (command.State)
                     {
                         case MkvState.Play:
-                            OnStart();
+                            OnStart(command);
                             break;
                         case MkvState.Shutdown:
                             _currentState = MkvState.Shutdown;
@@ -181,6 +181,7 @@ namespace VideoDecoders.MediaFoundation.Mkv
                 if(_currentState == MkvState.Play)
                 {
                     LoadNextFrame();
+                    continue;
                 }
 
                 // We are stopped pretty much... we have nothing to do... so just wait instead of wasting cycles
@@ -189,17 +190,42 @@ namespace VideoDecoders.MediaFoundation.Mkv
             }
         }
 
-        private void OnStart()
+        private void OnStart(MkvStateCommand command)
         {
             if (_currentState == MkvState.Play) { return; }
-            QueueEvent(MediaEventType.MESourceStarted, Guid.Empty, S_Ok, new PropVariant());
 
             _currentState = MkvState.Play;
+            QueueEvent(MediaEventType.MESourceStarted, Guid.Empty, S_Ok, new PropVariant());
+
+            // Work out the right tracks to play...
+            var selectedTracks = new List<int>();
+            int count;
+            TestSuccess("Could not get count", command.Descriptor.GetStreamDescriptorCount(out count));
+
+            for(int i=0; i<count; i++)
+            {
+                bool selected;
+                IMFStreamDescriptor desc;
+                TestSuccess("Could not get stream descriptor", command.Descriptor.GetStreamDescriptorByIndex(i, out selected, out desc));
+                if(selected)
+                {
+                    int trackId;
+                    TestSuccess("Could not get stream identifier", desc.GetStreamIdentifier(out trackId));
+                    selectedTracks.Add(trackId);
+                }
+            }
+
+            // Play them!
+            foreach (var t in _tracks)
+            {
+                t.IsSelected = selectedTracks.Contains((int)t.Metadata.TrackNumber);
+                t.SendUpdatedEvent(command.Prop);
+            }
         }
 
         private void LoadNextFrame()
         {
-            
+            Thread.Sleep(20);
         }
 
         private void TestSuccess(string message, int hResult)

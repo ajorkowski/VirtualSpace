@@ -34,7 +34,11 @@ namespace VirtualSpace.Platform.Windows.Rendering.Screen
             DrawOrder = UpdateOrder = RenderingOrder.World;
 
             game.GameSystems.Add(this);
-            ToDispose(new Disposable(() => game.GameSystems.Remove(this)));
+            ToDispose(new Disposable(() =>
+            {
+                ((IContentable)this).UnloadContent();
+                game.GameSystems.Remove(this);
+            }));
         }
 
         protected override void LoadContent()

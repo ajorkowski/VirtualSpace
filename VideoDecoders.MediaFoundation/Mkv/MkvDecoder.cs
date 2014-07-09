@@ -27,19 +27,39 @@ namespace VideoDecoders.MediaFoundation.Mkv
         public MkvMetadata Metadata { get { return _metadata; } }
         public StreamMetadata StreamMetadata { get { return _streamMetadata; } }
 
-        private void GetNextBlock()
+        private ulong _currentClusterTimecode;
+        public bool SeekNextBlock(List<int> ignoredTracks, ref MkvBlockHeader header)
         {
             if(_hasFinished)
             {
-                return; //null;
+                return false;
             }
 
-            if(!_hasStarted)
+            while (true)
             {
-                _reader.LocateElement(MatroskaElementDescriptorProvider.Cluster);
-                _reader.EnterContainer();
+                if (!_hasStarted)
+                {
+                    if (!_reader.LocateElement(MatroskaElementDescriptorProvider.Cluster))
+                    {
+                        // No more clusters
+                        _hasFinished = true;
+                        return false;
+                    }
+
+                    _reader.EnterContainer();
+                    _hasStarted = true;
+                }
+
+                if (_reader.ReadNext())
+                {
+                    break;
+                }
+
+                _reader.LeaveContainer();
                 _hasStarted = true;
             }
+
+            return true;
         }
 
         private MkvMetadata GetMetadata()

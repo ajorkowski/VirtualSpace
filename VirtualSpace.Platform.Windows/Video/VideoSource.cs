@@ -310,28 +310,41 @@ namespace VirtualSpace.Platform.Windows.Video
                     long timeStamp;
                     using (var sample = _reader.ReadSample(MF_SOURCE_READER_FIRST_VIDEO_STREAM, SourceReaderControlFlags.None, out streamIndex, out flags, out timeStamp))
                     {
-                        if (sample == null)
+                        if (flags.HasFlag(SourceReaderFlags.StreamTick))
+                        {
+                            _unusedFrames.Add(unused);
+                            continue;
+                        }
+
+                        if (flags.HasFlag(SourceReaderFlags.Endofstream))
                         {
                             _unusedFrames.Add(unused);
                             _isBuffering = false;
                             break;
                         }
 
-                        unused.Timestamp = TimeSpan.FromMilliseconds(timeStamp / 10000.0); // timestamps are in 100 nanoseconds
-                        switch (_mode)
+                        if (sample != null)
                         {
-                            case VideoMode.Dx11:
-                                QueueSampleDx11(sample, unused.Texture);
-                                break;
-                            case VideoMode.Software:
-                                QueueSampleSoftware(sample, unused.Texture);
-                                break;
-                            default:
-                                _unusedFrames.Add(unused);
-                                throw new NotImplementedException("Video mode is not yet supported...");
-                        }
+                            unused.Timestamp = TimeSpan.FromMilliseconds(timeStamp / 10000.0); // timestamps are in 100 nanoseconds
+                            switch (_mode)
+                            {
+                                case VideoMode.Dx11:
+                                    QueueSampleDx11(sample, unused.Texture);
+                                    break;
+                                case VideoMode.Software:
+                                    QueueSampleSoftware(sample, unused.Texture);
+                                    break;
+                                default:
+                                    _unusedFrames.Add(unused);
+                                    throw new NotImplementedException("Video mode is not yet supported...");
+                            }
 
-                        _bufferedFrames.Enqueue(unused);
+                            _bufferedFrames.Enqueue(unused);
+                        }
+                        else
+                        {
+                            _unusedFrames.Add(unused);
+                        }
                     }
                 }
                 else

@@ -48,6 +48,7 @@
   <ItemGroup>
     <Compile Include="IMFByteStreamWrapper.cs" />
     <Compile Include="Mkv\IMkvTrack.cs" />
+    <Compile Include="Mkv\MkvBlockHeader.cs" />
     <Compile Include="Mkv\MkvDecoder.cs" />
     <Compile Include="Mkv\MkvDecoderActivator.cs" />
     <Compile Include="Mkv\MkvDecoderByteStreamHandler.cs" />

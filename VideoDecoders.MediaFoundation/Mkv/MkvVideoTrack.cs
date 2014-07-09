@@ -15,6 +15,8 @@ namespace VideoDecoders.MediaFoundation.Mkv
         private readonly IMFMediaEventQueue _eventQueue;
         private readonly ConcurrentQueue<object> _tokenQueue;
 
+        private bool _hasShutdown;
+
         private bool _hasSelected;
         private bool _isSelected;
         private bool _endOfStream;
@@ -71,71 +73,98 @@ namespace VideoDecoders.MediaFoundation.Mkv
             typeHandler.SetCurrentMediaType(type);
         }
 
-        public void SendUpdatedEvent(ConstPropVariant startTime)
+        public void ProcessSample()
         {
-            if (IsSelected)
+            // Only dequeue one token at a time...
+            object token;
+            if (_tokenQueue.TryDequeue(out token))
             {
-                if (_hasSelected)
+                var sample = _mediaSource.LoadNextSample((int)Metadata.TrackNumber);
+
+                if (token != null)
                 {
-                    _mediaSource.QueueEvent(MediaEventType.MEUpdatedStream, Guid.Empty, S_Ok, new PropVariant(this));
-                }
-                else
-                {
-                    _mediaSource.QueueEvent(MediaEventType.MENewStream, Guid.Empty, S_Ok, new PropVariant(this));
-                    _hasSelected = true;
+                    sample.SetUnknown(MFAttributesClsid.MFSampleExtension_Token, token);
                 }
 
-                QueueEvent(MediaEventType.MEStreamStarted, Guid.Empty, S_Ok, startTime);
+                QueueEvent(MediaEventType.MEMediaSample, Guid.Empty, S_Ok, new PropVariant(sample));
             }
         }
 
         public int RequestSample(object pToken)
         {
-            if (_mediaSource.CurrentState == MkvState.Shutdown) { return MFError.MF_E_SHUTDOWN; }
+            if (_hasShutdown) { return MFError.MF_E_SHUTDOWN; }
             if (_mediaSource.CurrentState == MkvState.Stop) { return MFError.MF_E_MEDIA_SOURCE_WRONGSTATE; }
             if (_endOfStream) { return MFError.MF_E_END_OF_STREAM; }
 
-            if (pToken != null)
-            {
-                //_tokenQueue.Enqueue(pToken);
+            _tokenQueue.Enqueue(pToken);
 
-                // We have no media data... just release the token...
-                Marshal.ReleaseComObject(pToken);
-            }
+            //QueueEvent(MediaEventType.MEStreamTick, Guid.Empty, S_Ok, new PropVariant((long)0));
+            //QueueEvent(MediaEventType.MEStreamTick, Guid.Empty, S_Ok, new PropVariant((long)100));
+            //QueueEvent(MediaEventType.MEStreamTick, Guid.Empty, S_Ok, new PropVariant((long)200));
+
+            //QueueEvent(MediaEventType.MEEndOfStream, Guid.Empty, S_Ok, new PropVariant());
+            //_mediaSource.QueueEvent(MediaEventType.MEEndOfPresentation, Guid.Empty, S_Ok, new PropVariant());
 
             return S_Ok;
         }
 
         public int BeginGetEvent(IMFAsyncCallback pCallback, object o)
         {
+            if (_hasShutdown) { return MFError.MF_E_SHUTDOWN; }
+
             return _eventQueue.BeginGetEvent(pCallback, o);
         }
 
         public int EndGetEvent(IMFAsyncResult pResult, out IMFMediaEvent ppEvent)
         {
+            if (_hasShutdown) { ppEvent = null; return MFError.MF_E_SHUTDOWN; }
+
             return _eventQueue.EndGetEvent(pResult, out ppEvent);
         }
 
         public int GetEvent(MFEventFlag dwFlags, out IMFMediaEvent ppEvent)
         {
+            if (_hasShutdown) { ppEvent = null; return MFError.MF_E_SHUTDOWN; }
+
             return _eventQueue.GetEvent(dwFlags, out ppEvent);
         }
 
         public int QueueEvent(MediaEventType met, Guid guidExtendedType, int hrStatus, ConstPropVariant pvValue)
         {
+            if (_hasShutdown) { return MFError.MF_E_SHUTDOWN; }
+
             return _eventQueue.QueueEventParamVar(met, guidExtendedType, hrStatus, pvValue);
         }
 
         public int GetMediaSource(out IMFMediaSource ppMediaSource)
         {
+            if (_hasShutdown) { ppMediaSource = null; return MFError.MF_E_SHUTDOWN; }
+
             ppMediaSource = _mediaSource;
             return S_Ok;
         }
 
         public int GetStreamDescriptor(out IMFStreamDescriptor ppStreamDescriptor)
         {
+            if (_hasShutdown) { ppStreamDescriptor = null; return MFError.MF_E_SHUTDOWN; }
+
             ppStreamDescriptor = Descriptor;
             return S_Ok;
+        }
+
+        public void Dispose()
+        {
+            _hasShutdown = true;
+            _eventQueue.Shutdown();
+
+            // Release any left over tokens...
+            object token;
+            while (_tokenQueue.TryDequeue(out token)) {
+                if (token != null)
+                {
+                    Marshal.ReleaseComObject(token);
+                }
+            };
         }
 
         private void TestSuccess(string message, int hResult)

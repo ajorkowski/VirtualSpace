@@ -1,10 +1,10 @@
 ﻿using MediaFoundation;
 using MediaFoundation.Misc;
 using System;
-using System.Collections.Generic;
-using System.Runtime.InteropServices;
-using System.Linq;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
+using System.Linq;
+using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -16,6 +16,8 @@ namespace VideoDecoders.MediaFoundation.Mkv
     {
         private readonly MkvDecoder _decoder;
         private readonly List<IMkvTrack> _tracks;
+        private readonly List<int> _ignoredTrackNumbers;
+        private readonly Dictionary<int, Queue<IMFSample>> _queuedBuffers;
         private readonly IMFPresentationDescriptor _descriptor;
         private readonly ConcurrentQueue<MkvStateCommand> _commands;
         private readonly IMFMediaEventQueue _eventQueue;
@@ -33,6 +35,8 @@ namespace VideoDecoders.MediaFoundation.Mkv
             _commands = new ConcurrentQueue<MkvStateCommand>();
             _commandReset = new ManualResetEvent(true);
             _currentState = MkvState.Stop;
+            _ignoredTrackNumbers = new List<int>();
+            _queuedBuffers = new Dictionary<int, Queue<IMFMediaBuffer>>();
 
             foreach (var t in _decoder.Metadata.Tracks)
             {
@@ -105,6 +109,12 @@ namespace VideoDecoders.MediaFoundation.Mkv
             _commandProcess.Dispose();
             _commandReset.Dispose();
 
+            foreach (var t in _tracks)
+            {
+                t.Dispose();
+            }
+            _tracks.Clear();
+
             return _eventQueue.Shutdown();
         }
 
@@ -149,16 +159,29 @@ namespace VideoDecoders.MediaFoundation.Mkv
             return S_Ok;
         }
 
-        private void SetEvent(MkvStateCommand command)
+        public IMFSample LoadNextSample(int track)
         {
-            _commands.Enqueue(command);
-            _commandReset.Set();
+            if (_queuedBuffers[track].Count > 0)
+            {
+                return _queuedBuffers[track].Dequeue();
+            }
+
+            while (true)
+            {
+                MkvBlockHeader header;
+                if (!_decoder.SeekNextBlock(_ignoredTrackNumbers, out header))
+                {
+                    return null;
+                }
+
+                IMFSample sample;
+                TestSuccess("Could not media sample", MFExtern.MFCreateSample(out sample));
+            }
         }
 
         private void ProcessCommandQueue()
         {
-            bool isRunning = true;
-            while (isRunning)
+            while (_currentState != MkvState.Shutdown)
             {
                 MkvStateCommand command;
                 if (_commands.Count > 0 && _commands.TryDequeue(out command))
@@ -170,7 +193,6 @@ namespace VideoDecoders.MediaFoundation.Mkv
                             break;
                         case MkvState.Shutdown:
                             _currentState = MkvState.Shutdown;
-                            isRunning = false;
                             break;
                         default:
                             throw new InvalidOperationException("Unsupported state");
@@ -193,39 +215,72 @@ namespace VideoDecoders.MediaFoundation.Mkv
         private void OnStart(MkvStateCommand command)
         {
             if (_currentState == MkvState.Play) { return; }
-
             _currentState = MkvState.Play;
-            QueueEvent(MediaEventType.MESourceStarted, Guid.Empty, S_Ok, new PropVariant());
 
             // Work out the right tracks to play...
             var selectedTracks = new List<int>();
             int count;
             TestSuccess("Could not get count", command.Descriptor.GetStreamDescriptorCount(out count));
 
+            _ignoredTrackNumbers.Clear();
+            _queuedBuffers.Clear();
             for(int i=0; i<count; i++)
             {
                 bool selected;
                 IMFStreamDescriptor desc;
                 TestSuccess("Could not get stream descriptor", command.Descriptor.GetStreamDescriptorByIndex(i, out selected, out desc));
-                if(selected)
+
+                int trackId;
+                TestSuccess("Could not get stream identifier", desc.GetStreamIdentifier(out trackId));
+
+                if (selected)
                 {
-                    int trackId;
-                    TestSuccess("Could not get stream identifier", desc.GetStreamIdentifier(out trackId));
                     selectedTracks.Add(trackId);
+                    _queuedBuffers[trackId] = new Queue<IMFSample>();
+                }
+                else
+                {
+                    _ignoredTrackNumbers.Add(trackId);
                 }
             }
 
-            // Play them!
+            // Send the right events out in the right order...
             foreach (var t in _tracks)
             {
-                t.IsSelected = selectedTracks.Contains((int)t.Metadata.TrackNumber);
-                t.SendUpdatedEvent(command.Prop);
+                bool willSelect = selectedTracks.Contains((int)t.Metadata.TrackNumber);
+                if (willSelect)
+                {
+                    QueueEvent(t.IsSelected ? MediaEventType.MEUpdatedStream : MediaEventType.MENewStream, Guid.Empty, S_Ok, new PropVariant(t));
+                }
+                t.IsSelected = willSelect;
+            }
+
+            QueueEvent(MediaEventType.MESourceStarted, Guid.Empty, S_Ok, command.Prop);
+
+            foreach(var t in _tracks)
+            {
+                if (t.IsSelected)
+                {
+                    t.QueueEvent(MediaEventType.MEStreamStarted, Guid.Empty, S_Ok, command.Prop);
+                }
             }
         }
 
         private void LoadNextFrame()
         {
-            Thread.Sleep(20);
+            foreach (var t in _tracks)
+            {
+                if (t.IsSelected)
+                {
+                    t.ProcessSample();
+                }
+            }
+        }
+
+        private void SetEvent(MkvStateCommand command)
+        {
+            _commands.Enqueue(command);
+            _commandReset.Set();
         }
 
         private void TestSuccess(string message, int hResult)

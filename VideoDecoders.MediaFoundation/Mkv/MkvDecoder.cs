@@ -15,19 +15,26 @@ namespace VideoDecoders.MediaFoundation.Mkv
 
         private bool _hasStarted;
         private bool _hasFinished;
+        
+        // Cluster/block tracking
+        private ulong _currentClusterTimecode;
+        private bool _isInBlockGroup;
+        private byte[] _blockHeaderBuffer;
 
         public MkvDecoder(Stream stream, StreamMetadata streamMetadata)
         {
             _reader = new EbmlReader(stream);
             _medp = new MatroskaElementDescriptorProvider();
+            _currentClusterTimecode = ulong.MaxValue;
+
             _metadata = GetMetadata();
             _streamMetadata = streamMetadata;
+            _blockHeaderBuffer = new byte[21]; // 21 is the max, but could be variable...
         }
 
         public MkvMetadata Metadata { get { return _metadata; } }
         public StreamMetadata StreamMetadata { get { return _streamMetadata; } }
 
-        private ulong _currentClusterTimecode;
         public bool SeekNextBlock(List<int> ignoredTracks, ref MkvBlockHeader header)
         {
             if(_hasFinished)
@@ -50,9 +57,42 @@ namespace VideoDecoders.MediaFoundation.Mkv
                     _hasStarted = true;
                 }
 
-                if (_reader.ReadNext())
+                while (_reader.ReadNext())
                 {
-                    break;
+                    var descriptor = _medp.GetElementDescriptor(_reader.ElementId);
+                    if (descriptor == null) continue;
+
+                    if (_isInBlockGroup)
+                    {
+                        // Block Group reading
+                        switch (descriptor.Name)
+                        {
+                            case "Block":
+                                // TODO: Parse block header
+                                throw new NotImplementedException();
+                        }
+                    }
+                    else
+                    {
+                        // Cluster reads
+                        switch (descriptor.Name)
+                        {
+                            case "SimpleBlock":
+                                // TODO: Parse simple block header
+                                
+                                
+                            case "BlockGroup":
+                                _isInBlockGroup = true;
+                                _reader.EnterContainer();
+                                break;
+                        }
+                    }
+                }
+
+                if (_isInBlockGroup)
+                {
+                    _reader.LeaveContainer();
+                    continue;
                 }
 
                 _reader.LeaveContainer();
@@ -60,6 +100,19 @@ namespace VideoDecoders.MediaFoundation.Mkv
             }
 
             return true;
+        }
+
+        private void ReadBlockHeader(bool isSimple, ref MkvBlockHeader header)
+        {
+            if (!isSimple)
+            {
+                throw new NotImplementedException();
+            }
+
+            // Header is minimum 6 octects
+            _reader.ReadBinary(_blockHeaderBuffer, 0, 6);
+
+            throw new NotImplementedException();
         }
 
         private MkvMetadata GetMetadata()

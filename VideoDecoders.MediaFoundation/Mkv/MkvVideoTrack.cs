@@ -2,7 +2,6 @@
 using MediaFoundation.Misc;
 using System;
 using System.Collections.Concurrent;
-using System.Collections.Generic;
 using System.Runtime.InteropServices;
 
 namespace VideoDecoders.MediaFoundation.Mkv
@@ -16,22 +15,12 @@ namespace VideoDecoders.MediaFoundation.Mkv
         private readonly ConcurrentQueue<object> _tokenQueue;
 
         private bool _hasShutdown;
-
-        private bool _hasSelected;
-        private bool _isSelected;
         private bool _endOfStream;
 
         public IMFStreamDescriptor Descriptor { get { return _descriptor; } }
         public TrackEntry Metadata { get { return _entry; } }
-        public bool IsSelected 
-        {
-            get { return _isSelected; }
-            set
-            {
-                _isSelected = value;
-                if (!_isSelected) { _hasSelected = false; }
-            }
-        }
+        public bool IsEOS { get { return _endOfStream; } }
+        public bool IsSelected { get; set; }
 
         public MkvVideoTrack(TrackEntry entry, MkvMediaSource mediaSource)
         {
@@ -80,6 +69,12 @@ namespace VideoDecoders.MediaFoundation.Mkv
             if (_tokenQueue.TryDequeue(out token))
             {
                 var sample = _mediaSource.LoadNextSample((int)Metadata.TrackNumber);
+                if (sample == null)
+                {
+                    QueueEvent(MediaEventType.MEEndOfStream, Guid.Empty, S_Ok, new PropVariant());
+                    EndAndPurgeStream();
+                    return;
+                }
 
                 if (token != null)
                 {
@@ -158,8 +153,15 @@ namespace VideoDecoders.MediaFoundation.Mkv
             _eventQueue.Shutdown();
 
             // Release any left over tokens...
+            EndAndPurgeStream();
+        }
+
+        private void EndAndPurgeStream()
+        {
+            _endOfStream = true;
             object token;
-            while (_tokenQueue.TryDequeue(out token)) {
+            while (_tokenQueue.TryDequeue(out token))
+            {
                 if (token != null)
                 {
                     Marshal.ReleaseComObject(token);

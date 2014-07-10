@@ -21,6 +21,7 @@ namespace VideoDecoders.MediaFoundation.Mkv
         Play,
         Pause,
         Restart,
-        Shutdown
+        Shutdown,
+        EndOfPresentation
     }
 }

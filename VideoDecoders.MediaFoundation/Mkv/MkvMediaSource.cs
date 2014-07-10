@@ -36,7 +36,7 @@ namespace VideoDecoders.MediaFoundation.Mkv
             _commandReset = new ManualResetEvent(true);
             _currentState = MkvState.Stop;
             _ignoredTrackNumbers = new List<int>();
-            _queuedBuffers = new Dictionary<int, Queue<IMFMediaBuffer>>();
+            _queuedBuffers = new Dictionary<int, Queue<IMFSample>>();
 
             foreach (var t in _decoder.Metadata.Tracks)
             {
@@ -168,14 +168,24 @@ namespace VideoDecoders.MediaFoundation.Mkv
 
             while (true)
             {
-                MkvBlockHeader header;
-                if (!_decoder.SeekNextBlock(_ignoredTrackNumbers, out header))
+                MkvBlockHeader header = new MkvBlockHeader();
+                if (!_decoder.SeekNextBlock(_ignoredTrackNumbers, ref header))
                 {
                     return null;
                 }
 
                 IMFSample sample;
                 TestSuccess("Could not media sample", MFExtern.MFCreateSample(out sample));
+
+                // TODO: Load media buffers
+
+                if (header.TrackNumber == track)
+                {
+                    return sample;
+                }
+                else
+                {
+                }
             }
         }
 
@@ -268,12 +278,20 @@ namespace VideoDecoders.MediaFoundation.Mkv
 
         private void LoadNextFrame()
         {
+            bool isEop = true;
             foreach (var t in _tracks)
             {
-                if (t.IsSelected)
+                if (t.IsSelected && !t.IsEOS)
                 {
+                    isEop = false;
                     t.ProcessSample();
                 }
+            }
+
+            if (isEop)
+            {
+                _currentState = MkvState.EndOfPresentation;
+                QueueEvent(MediaEventType.MEEndOfPresentation, Guid.Empty, S_Ok, new PropVariant());
             }
         }
 

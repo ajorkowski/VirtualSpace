@@ -68,8 +68,12 @@ namespace VideoDecoders.MediaFoundation.Mkv
                         switch (descriptor.Name)
                         {
                             case "Block":
-                                // TODO: Parse block header
-                                throw new NotImplementedException();
+                                ReadBlockHeader(false, ref header);
+                                if (ignoredTracks.Contains(header.TrackNumber))
+                                {
+                                    continue;
+                                }
+                                return true;
                         }
                     }
                     else
@@ -78,9 +82,12 @@ namespace VideoDecoders.MediaFoundation.Mkv
                         switch (descriptor.Name)
                         {
                             case "SimpleBlock":
-                                // TODO: Parse simple block header
-                                
-                                
+                                ReadBlockHeader(true, ref header);
+                                if (ignoredTracks.Contains(header.TrackNumber))
+                                {
+                                    continue;
+                                }
+                                return true;
                             case "BlockGroup":
                                 _isInBlockGroup = true;
                                 _reader.EnterContainer();
@@ -109,10 +116,24 @@ namespace VideoDecoders.MediaFoundation.Mkv
                 throw new NotImplementedException();
             }
 
-            // Header is minimum 6 octects
-            _reader.ReadBinary(_blockHeaderBuffer, 0, 6);
+            header.TrackNumber = (int)_reader.ReadVarIntInline(8).Value;
+            header.TimeCode = _reader.ReadSignedIntegerInline(2);
+            
+            // Read a byte for flags
+            _reader.ReadBinary(_blockHeaderBuffer, 0, 1);
+            byte flags = _blockHeaderBuffer[0];
+            header.KeyFrame = (flags & (1 << 0)) != 0;
+            header.Invisible = (flags & (1 << 4)) != 0;
+            bool firstLace = (flags & (1 << 5)) != 0;
+            bool secondLace = (flags & (1 << 6)) != 0;
+            header.Discardable = (flags & (1 << 7)) != 0;
 
-            throw new NotImplementedException();
+            header.Lacing = firstLace ? (secondLace ? Lacing.EBML : Lacing.FixedSize) : (secondLace ? Lacing.Xiph : Lacing.None);
+
+            if(header.Lacing != Lacing.None)
+            {
+                throw new NotImplementedException();
+            }
         }
 
         private MkvMetadata GetMetadata()

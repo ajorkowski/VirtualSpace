@@ -88,14 +88,14 @@ namespace NEbml.Core
 			}
 
 			_elementPosition = _source.Position;
-			var identifier = ReadVarInt(4);
+			var identifier = ReadVarIntInline(4);
 
 			if (identifier.IsReserved)
 			{
 				throw new EbmlDataFormatException("invalid element identifier value");
 			}
 
-			var size = ReadVarInt(8).Value;
+			var size = ReadVarIntInline(8).Value;
 			if (size > (ulong)_container.Remaining)
 			{
 				throw new EbmlDataFormatException("invalid element size value");
@@ -418,7 +418,7 @@ namespace NEbml.Core
 		/// <exception cref="EbmlDataFormatException">if the input source contains length descriptor with zero value</exception>
 		/// <exception cref="EndOfStreamException">if the input source reaches the end before reading all the bytes</exception>
 		/// <exception cref="IOException">if an I/O error has occurred</exception>
-		private VInt ReadVarInt(int maxLength)
+		public VInt ReadVarIntInline(int maxLength)
 		{
 			var value = VInt.Read(_source, maxLength, GetSharedBuffer(maxLength));
 			if (_element.Remaining < value.Length)
@@ -427,6 +427,28 @@ namespace NEbml.Core
 			_element.Remaining -= value.Length;
 			return value;
 		}
+
+        public long ReadSignedIntegerInline(int length)
+        {
+            if (_element.Remaining < length)
+                throw new EbmlDataFormatException();
+
+            var result = ReadSignedIntegerUnsafe(length);
+
+            _element.Remaining -= length;
+            return result;
+        }
+
+        public ulong ReadUnsignedIntegerInline(int length)
+        {
+            if (_element.Remaining < length)
+                throw new EbmlDataFormatException();
+
+            var result = ReadUnsignedIntegerUnsafe(length);
+
+            _element.Remaining -= length;
+            return result;
+        }
 
 		/// <summary>
 		/// Reads the element data as a signed integer.

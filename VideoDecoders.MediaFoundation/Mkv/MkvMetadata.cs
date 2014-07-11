@@ -48,6 +48,8 @@ namespace VideoDecoders.MediaFoundation.Mkv
         public bool FlagForced { get; set; }
         public bool FlagLacing { get; set; }
         public ulong MinCache { get; set; }
+        public ulong MaxCache { get; set; }
+        public ulong DefaultDuration { get; set; }
         public ulong MaxBlockAdditionID { get; set; }
         public string Name { get; set; }
         public string Language { get; set; }

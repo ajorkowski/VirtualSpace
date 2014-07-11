@@ -3,6 +3,7 @@ using NEbml.MkvTitleEdit.Matroska;
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 
 namespace VideoDecoders.MediaFoundation.Mkv
 {
@@ -35,7 +36,7 @@ namespace VideoDecoders.MediaFoundation.Mkv
         public MkvMetadata Metadata { get { return _metadata; } }
         public StreamMetadata StreamMetadata { get { return _streamMetadata; } }
 
-        public bool SeekNextBlock(List<int> ignoredTracks, ref MkvBlockHeader header)
+        public bool SeekNextBlock(List<int> validTracks, ref MkvBlockHeader header)
         {
             if(_hasFinished)
             {
@@ -69,7 +70,7 @@ namespace VideoDecoders.MediaFoundation.Mkv
                         {
                             case "Block":
                                 ReadBlockHeader(false, ref header);
-                                if (ignoredTracks.Contains(header.TrackNumber))
+                                if (!validTracks.Contains(header.TrackNumber))
                                 {
                                     continue;
                                 }
@@ -81,9 +82,12 @@ namespace VideoDecoders.MediaFoundation.Mkv
                         // Cluster reads
                         switch (descriptor.Name)
                         {
+                            case "Timecode":
+                                _currentClusterTimecode = _reader.ReadUInt() * Metadata.Info.TimecodeScale;
+                                break;
                             case "SimpleBlock":
                                 ReadBlockHeader(true, ref header);
-                                if (ignoredTracks.Contains(header.TrackNumber))
+                                if (!validTracks.Contains(header.TrackNumber))
                                 {
                                     continue;
                                 }
@@ -103,21 +107,57 @@ namespace VideoDecoders.MediaFoundation.Mkv
                 }
 
                 _reader.LeaveContainer();
+                _currentClusterTimecode = ulong.MaxValue;
                 _hasStarted = true;
             }
+        }
 
-            return true;
+        public long BlockSize()
+        {
+            return _reader.RemainingBytes;
+        }
+
+        public int ReadBlock(IntPtr buffer)
+        {
+            return _reader.ReadBinaryFully(buffer);
         }
 
         private void ReadBlockHeader(bool isSimple, ref MkvBlockHeader header)
         {
+            if (_currentClusterTimecode == ulong.MaxValue)
+            {
+                throw new InvalidOperationException("The cluster does not have a timecode - invalid");
+            }
+
             if (!isSimple)
             {
                 throw new NotImplementedException();
             }
 
-            header.TrackNumber = (int)_reader.ReadVarIntInline(8).Value;
-            header.TimeCode = _reader.ReadSignedIntegerInline(2);
+            var trackNumber = (int)_reader.ReadVarIntInline(8).Value;
+            var timecode = _reader.ReadSignedIntegerInline(2) * (long)Metadata.Info.TimecodeScale;
+
+            var track = Metadata.Tracks.FirstOrDefault(t => (int)t.TrackNumber == trackNumber);
+            if (track == null)
+            {
+                throw new InvalidOperationException("Cannot find associated track for this simple block");
+            }
+
+            header.TrackNumber = trackNumber;
+            if(timecode < 0)
+            {
+                var posTimecode = (ulong)Math.Abs(-timecode);
+                if(posTimecode > _currentClusterTimecode)
+                {
+                    throw new InvalidOperationException("Timecode for simple block is less than 0");
+                }
+                header.TimeCode = _currentClusterTimecode - posTimecode;
+            }
+            else
+            {
+                header.TimeCode = _currentClusterTimecode + (ulong)timecode;
+            }
+            header.Duration = track.DefaultDuration;
             
             // Read a byte for flags
             _reader.ReadBinary(_blockHeaderBuffer, 0, 1);
@@ -223,6 +263,12 @@ namespace VideoDecoders.MediaFoundation.Mkv
                                             break;
                                         case "MinCache":
                                             track.MinCache = r.ReadUInt();
+                                            break;
+                                        case "MaxCache":
+                                            track.MaxCache = r.ReadUInt();
+                                            break;
+                                        case "DefaultDuration":
+                                            track.DefaultDuration = r.ReadUInt();
                                             break;
                                         case "MaxBlockAdditionID":
                                             track.MaxBlockAdditionID = r.ReadUInt();
@@ -351,6 +397,11 @@ namespace VideoDecoders.MediaFoundation.Mkv
                         break;
                     }
                 }
+            }
+
+            if (info.TimecodeScale == 0)
+            {
+                throw new InvalidOperationException("Timecode scale must be defined");
             }
 
             return new MkvMetadata { Info = info, Tracks = tracks };

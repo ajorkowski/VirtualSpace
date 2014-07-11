@@ -57,6 +57,8 @@ namespace VideoDecoders.MediaFoundation
 
         public override int Read(byte[] buffer, int offset, int count)
         {
+            if (count == 0) { return 0; }
+
             int readAmount;
             var pinned = GCHandle.Alloc(buffer , GCHandleType.Pinned);
             var address = pinned.AddrOfPinnedObject();

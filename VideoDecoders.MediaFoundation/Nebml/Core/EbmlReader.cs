@@ -320,6 +320,75 @@ namespace NEbml.Core
 			return r;
 		}
 
+        public int ReadBinaryFully(IntPtr buffer)
+        {
+            if (_element.Remaining <= 0)
+            {
+                throw new EndOfStreamException();
+            }
+
+            int read = 0;
+            int length = (int)_element.Remaining;
+            unsafe
+            {
+                using (var buffStream = new UnmanagedMemoryStream((byte*)buffer.ToPointer(), length, length, FileAccess.Write))
+                {
+                    byte[] b = GetSharedBuffer(2048);
+                    while (length > 0)
+                    {
+                        int r = _source.Read(b, 0, Math.Min(length, 2048));
+                        if (r < 0)
+                        {
+                            throw new EndOfStreamException();
+                        }
+                        buffStream.Write(b, 0, r);
+                        length -= r;
+                        _element.Remaining -= r;
+                        read += r;
+                    }
+                }
+            }
+            return read;
+        }
+
+        /// <summary>
+        /// Reads the element data as a variable size integer.
+        /// </summary>
+        /// <returns>a variable size integer, or <code>null</code> if the end of the input source is reached</returns>
+        /// <exception cref="EbmlDataFormatException">if the input source contains length descriptor with zero value</exception>
+        /// <exception cref="EndOfStreamException">if the input source reaches the end before reading all the bytes</exception>
+        /// <exception cref="IOException">if an I/O error has occurred</exception>
+        public VInt ReadVarIntInline(int maxLength)
+        {
+            var value = VInt.Read(_source, maxLength, GetSharedBuffer(maxLength));
+            if (_element.Remaining < value.Length)
+                throw new EbmlDataFormatException();
+
+            _element.Remaining -= value.Length;
+            return value;
+        }
+
+        public long ReadSignedIntegerInline(int length)
+        {
+            if (_element.Remaining < length)
+                throw new EbmlDataFormatException();
+
+            return ReadSignedIntegerUnsafe(length);
+        }
+
+        public ulong ReadUnsignedIntegerInline(int length)
+        {
+            if (_element.Remaining < length)
+                throw new EbmlDataFormatException();
+
+            var result = ReadUnsignedIntegerUnsafe(length);
+
+            _element.Remaining -= length;
+            return result;
+        }
+
+        public long RemainingBytes { get { return _element.Remaining; } }
+
 		#endregion
 
 		#region IDisposable Members
@@ -410,45 +479,6 @@ namespace NEbml.Core
 				_element.Remaining -= r;
 			}
 		}
-
-		/// <summary>
-		/// Reads the element data as a variable size integer.
-		/// </summary>
-		/// <returns>a variable size integer, or <code>null</code> if the end of the input source is reached</returns>
-		/// <exception cref="EbmlDataFormatException">if the input source contains length descriptor with zero value</exception>
-		/// <exception cref="EndOfStreamException">if the input source reaches the end before reading all the bytes</exception>
-		/// <exception cref="IOException">if an I/O error has occurred</exception>
-		public VInt ReadVarIntInline(int maxLength)
-		{
-			var value = VInt.Read(_source, maxLength, GetSharedBuffer(maxLength));
-			if (_element.Remaining < value.Length)
-				throw new EbmlDataFormatException();
-
-			_element.Remaining -= value.Length;
-			return value;
-		}
-
-        public long ReadSignedIntegerInline(int length)
-        {
-            if (_element.Remaining < length)
-                throw new EbmlDataFormatException();
-
-            var result = ReadSignedIntegerUnsafe(length);
-
-            _element.Remaining -= length;
-            return result;
-        }
-
-        public ulong ReadUnsignedIntegerInline(int length)
-        {
-            if (_element.Remaining < length)
-                throw new EbmlDataFormatException();
-
-            var result = ReadUnsignedIntegerUnsafe(length);
-
-            _element.Remaining -= length;
-            return result;
-        }
 
 		/// <summary>
 		/// Reads the element data as a signed integer.

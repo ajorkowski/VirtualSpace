@@ -16,7 +16,7 @@ namespace VideoDecoders.MediaFoundation.Mkv
     {
         private readonly MkvDecoder _decoder;
         private readonly List<IMkvTrack> _tracks;
-        private readonly List<int> _ignoredTrackNumbers;
+        private readonly List<int> _validTrackNumbers;
         private readonly Dictionary<int, Queue<IMFSample>> _queuedBuffers;
         private readonly IMFPresentationDescriptor _descriptor;
         private readonly ConcurrentQueue<MkvStateCommand> _commands;
@@ -35,7 +35,7 @@ namespace VideoDecoders.MediaFoundation.Mkv
             _commands = new ConcurrentQueue<MkvStateCommand>();
             _commandReset = new ManualResetEvent(true);
             _currentState = MkvState.Stop;
-            _ignoredTrackNumbers = new List<int>();
+            _validTrackNumbers = new List<int>();
             _queuedBuffers = new Dictionary<int, Queue<IMFSample>>();
 
             foreach (var t in _decoder.Metadata.Tracks)
@@ -169,15 +169,29 @@ namespace VideoDecoders.MediaFoundation.Mkv
             while (true)
             {
                 MkvBlockHeader header = new MkvBlockHeader();
-                if (!_decoder.SeekNextBlock(_ignoredTrackNumbers, ref header))
+                if (!_decoder.SeekNextBlock(_validTrackNumbers, ref header))
                 {
                     return null;
                 }
 
                 IMFSample sample;
-                TestSuccess("Could not media sample", MFExtern.MFCreateSample(out sample));
+                TestSuccess("Could not create media sample", MFExtern.MFCreateSample(out sample));
 
-                // TODO: Load media buffers
+                sample.SetSampleTime((long)(header.TimeCode / 100));
+                sample.SetSampleDuration((long)(header.Duration / 100));
+
+                int bufferLength = (int)_decoder.BlockSize();
+                IMFMediaBuffer buffer;
+                TestSuccess("Could not create media buffer", MFExtern.MFCreateMemoryBuffer(bufferLength, out buffer));
+
+                int currentLength;
+                IntPtr bufferPtr;
+                TestSuccess("Could not lock media buffer", buffer.Lock(out bufferPtr, out bufferLength, out currentLength));
+
+                currentLength = _decoder.ReadBlock(bufferPtr);
+
+                TestSuccess("Could not set media buffer length", buffer.SetCurrentLength(currentLength));
+                TestSuccess("Could not unlock media buffer", buffer.Unlock());
 
                 if (header.TrackNumber == track)
                 {
@@ -185,6 +199,7 @@ namespace VideoDecoders.MediaFoundation.Mkv
                 }
                 else
                 {
+                    _queuedBuffers[header.TrackNumber].Enqueue(sample);
                 }
             }
         }
@@ -228,11 +243,10 @@ namespace VideoDecoders.MediaFoundation.Mkv
             _currentState = MkvState.Play;
 
             // Work out the right tracks to play...
-            var selectedTracks = new List<int>();
             int count;
             TestSuccess("Could not get count", command.Descriptor.GetStreamDescriptorCount(out count));
 
-            _ignoredTrackNumbers.Clear();
+            _validTrackNumbers.Clear();
             _queuedBuffers.Clear();
             for(int i=0; i<count; i++)
             {
@@ -245,19 +259,15 @@ namespace VideoDecoders.MediaFoundation.Mkv
 
                 if (selected)
                 {
-                    selectedTracks.Add(trackId);
+                    _validTrackNumbers.Add(trackId);
                     _queuedBuffers[trackId] = new Queue<IMFSample>();
-                }
-                else
-                {
-                    _ignoredTrackNumbers.Add(trackId);
                 }
             }
 
             // Send the right events out in the right order...
             foreach (var t in _tracks)
             {
-                bool willSelect = selectedTracks.Contains((int)t.Metadata.TrackNumber);
+                bool willSelect = _validTrackNumbers.Contains((int)t.Metadata.TrackNumber);
                 if (willSelect)
                 {
                     QueueEvent(t.IsSelected ? MediaEventType.MEUpdatedStream : MediaEventType.MENewStream, Guid.Empty, S_Ok, new PropVariant(t));

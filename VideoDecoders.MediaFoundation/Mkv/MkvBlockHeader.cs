@@ -3,7 +3,8 @@
     public struct MkvBlockHeader
     {
         public int TrackNumber { get; set; }
-        public long TimeCode { get; set; }
+        public ulong TimeCode { get; set; }
+        public ulong Duration { get; set; }
 
         public bool KeyFrame { get; set; }
         public bool Invisible { get; set; }

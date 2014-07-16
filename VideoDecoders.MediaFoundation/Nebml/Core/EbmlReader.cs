@@ -320,37 +320,6 @@ namespace NEbml.Core
 			return r;
 		}
 
-        public int ReadBinaryFully(IntPtr buffer)
-        {
-            if (_element.Remaining <= 0)
-            {
-                throw new EndOfStreamException();
-            }
-
-            int read = 0;
-            int length = (int)_element.Remaining;
-            unsafe
-            {
-                using (var buffStream = new UnmanagedMemoryStream((byte*)buffer.ToPointer(), length, length, FileAccess.Write))
-                {
-                    byte[] b = GetSharedBuffer(2048);
-                    while (length > 0)
-                    {
-                        int r = _source.Read(b, 0, Math.Min(length, 2048));
-                        if (r < 0)
-                        {
-                            throw new EndOfStreamException();
-                        }
-                        buffStream.Write(b, 0, r);
-                        length -= r;
-                        _element.Remaining -= r;
-                        read += r;
-                    }
-                }
-            }
-            return read;
-        }
-
         /// <summary>
         /// Reads the element data as a variable size integer.
         /// </summary>

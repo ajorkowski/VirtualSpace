@@ -48,6 +48,7 @@ namespace VideoDecoders.MediaFoundation.Mkv
             }
 
             TestSuccess("Could not create presentation descriptor", MFExtern.MFCreatePresentationDescriptor(_tracks.Count, _tracks.Select(t => t.Descriptor).ToArray(), out _descriptor));
+            _descriptor.SetUINT64(MFAttributesClsid.MF_PD_DURATION, (long)(_decoder.Metadata.Info.Duration / 100));
 
             for (int i = 0; i < _tracks.Count; i++)
             {
@@ -76,7 +77,9 @@ namespace VideoDecoders.MediaFoundation.Mkv
         {
             if (_currentState == MkvState.Shutdown) { return MFError.MF_E_SHUTDOWN; }
             if (pguidTimeFormat != Guid.Empty) { return MFError.MF_E_UNSUPPORTED_TIME_FORMAT; }
-            if (pvarStartPosition.GetVariantType() != ConstPropVariant.VariantType.None) { return MFError.MF_E_INVALIDREQUEST; }
+
+            var variantType = pvarStartPosition.GetVariantType();
+            if (variantType != ConstPropVariant.VariantType.None && (variantType == ConstPropVariant.VariantType.Int64 && pvarStartPosition.GetLong() != 0)) { return MFError.MF_E_INVALIDREQUEST; }
 
             SetEvent(new MkvStateCommand { State = MkvState.Play, Descriptor = pPresentationDescriptor, Prop = pvarStartPosition });
             return S_Ok;
@@ -143,17 +146,17 @@ namespace VideoDecoders.MediaFoundation.Mkv
             pdwCharacteristics = MFMediaSourceCharacteristics.None;
             if (_decoder.StreamMetadata.CanPause)
             {
-                pdwCharacteristics &= MFMediaSourceCharacteristics.CanPause;
+                pdwCharacteristics |= MFMediaSourceCharacteristics.CanPause;
             }
 
             if (_decoder.StreamMetadata.CanSeek)
             {
-                pdwCharacteristics &= MFMediaSourceCharacteristics.CanSeek;
+                pdwCharacteristics |= MFMediaSourceCharacteristics.CanSeek;
             }
 
             if (_decoder.StreamMetadata.HasSlowSeek)
             {
-                pdwCharacteristics &= MFMediaSourceCharacteristics.HasSlowSeek;
+                pdwCharacteristics |= MFMediaSourceCharacteristics.HasSlowSeek;
             }
 
             return S_Ok;
@@ -180,18 +183,10 @@ namespace VideoDecoders.MediaFoundation.Mkv
                 sample.SetSampleTime((long)(header.TimeCode / 100));
                 sample.SetSampleDuration((long)(header.Duration / 100));
 
-                int bufferLength = (int)_decoder.BlockSize();
-                IMFMediaBuffer buffer;
-                TestSuccess("Could not create media buffer", MFExtern.MFCreateMemoryBuffer(bufferLength, out buffer));
+                var trackObj = _tracks.First(t => (int)t.Metadata.TrackNumber == header.TrackNumber);
+                var buffer = trackObj.CreateBufferFromBlock((int)_decoder.RemainingBlockSize, _decoder.ReadBlock);
 
-                int currentLength;
-                IntPtr bufferPtr;
-                TestSuccess("Could not lock media buffer", buffer.Lock(out bufferPtr, out bufferLength, out currentLength));
-
-                currentLength = _decoder.ReadBlock(bufferPtr);
-
-                TestSuccess("Could not set media buffer length", buffer.SetCurrentLength(currentLength));
-                TestSuccess("Could not unlock media buffer", buffer.Unlock());
+                TestSuccess("Could not attach buffer to sample", sample.AddBuffer(buffer));
 
                 if (header.TrackNumber == track)
                 {

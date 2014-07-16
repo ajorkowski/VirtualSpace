@@ -108,18 +108,21 @@ namespace VideoDecoders.MediaFoundation.Mkv
 
                 _reader.LeaveContainer();
                 _currentClusterTimecode = ulong.MaxValue;
-                _hasStarted = true;
+                _hasStarted = false;
             }
         }
 
-        public long BlockSize()
+        public long RemainingBlockSize
         {
-            return _reader.RemainingBytes;
+            get 
+            {
+                return _reader.RemainingBytes;
+            }
         }
 
-        public int ReadBlock(IntPtr buffer)
+        public int ReadBlock(byte[] buffer, int offset, int length)
         {
-            return _reader.ReadBinaryFully(buffer);
+            return _reader.ReadBinary(buffer, offset, length);
         }
 
         private void ReadBlockHeader(bool isSimple, ref MkvBlockHeader header)
@@ -181,6 +184,7 @@ namespace VideoDecoders.MediaFoundation.Mkv
             var tracks = new List<TrackEntry>();
             var info = new SegmentInfo();
 
+            double duration = 0;
             var r = _reader;
             var segmentFound = r.LocateElement(MatroskaElementDescriptorProvider.Segment);
             if (segmentFound)
@@ -207,7 +211,7 @@ namespace VideoDecoders.MediaFoundation.Mkv
                                     info.TimecodeScale = r.ReadUInt();
                                     break;
                                 case "Duration":
-                                    info.Duration = r.ReadFloat();
+                                    duration = r.ReadFloat();
                                     break;
                                 case "DateUTC":
                                     info.DateUTC = r.ReadDate();
@@ -282,7 +286,7 @@ namespace VideoDecoders.MediaFoundation.Mkv
                                         case "CodecID":
                                             track.CodecID = r.ReadAscii();
                                             break;
-                                        case "CodecP":
+                                        case "CodecPrivate":
                                             track.CodecPrivate = new byte[r.ElementSize];
                                             r.ReadBinary(track.CodecPrivate, 0, (int)r.ElementSize);
                                             break;
@@ -403,6 +407,8 @@ namespace VideoDecoders.MediaFoundation.Mkv
             {
                 throw new InvalidOperationException("Timecode scale must be defined");
             }
+
+            info.Duration = (ulong)(duration * info.TimecodeScale);
 
             return new MkvMetadata { Info = info, Tracks = tracks };
         }

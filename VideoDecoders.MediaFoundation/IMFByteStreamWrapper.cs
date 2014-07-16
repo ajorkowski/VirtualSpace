@@ -88,14 +88,19 @@ namespace VideoDecoders.MediaFoundation
             return position;
         }
 
+        public override long Length
+        {
+            get 
+            { 
+                long length;
+                TestSuccess("Could not get IMFByteStream length", _byteStream.GetLength(out length));
+                return length;
+            }
+        }
+
         public override void Flush()
         {
             throw new NotImplementedException();
-        }
-
-        public override long Length
-        {
-            get { throw new NotImplementedException(); }
         }
 
         public override void SetLength(long value)

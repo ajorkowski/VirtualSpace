@@ -390,6 +390,13 @@ namespace VirtualSpace.Platform.Windows.Video
                 int currentLength;
                 var dataPtr = buffer.Lock(out maxLength, out currentLength);
                 var box = _deviceContext.MapSubresource(bufferText, 0, MapMode.WriteDiscard, SharpDX.Direct3D11.MapFlags.None);
+
+                var testData = new byte[maxLength];
+                GCHandle pinnedArray = GCHandle.Alloc(testData, GCHandleType.Pinned);
+                IntPtr pointer = pinnedArray.AddrOfPinnedObject();
+                Utilities.CopyMemory(pointer, dataPtr, currentLength);
+                pinnedArray.Free();
+
                 Utilities.CopyMemory(box.DataPointer, dataPtr, currentLength);
                 _deviceContext.UnmapSubresource(bufferText, 0);
                 buffer.Unlock();
@@ -598,8 +605,9 @@ namespace VirtualSpace.Platform.Windows.Video
             }
 
             // No picture region defined, fall back to using the entire video area.
-            var data = type.Get(MediaTypeAttributeKeys.FrameSize.Guid);
-            return new Rectangle();
+            int width, height;
+            UnpackLong(type.Get<long>(MediaTypeAttributeKeys.FrameSize.Guid), out height, out width);
+            return new Rectangle(0, 0, width, height);
         }
 
         private static int GetDefaultStride(MediaType type)

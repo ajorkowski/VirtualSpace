@@ -21,7 +21,7 @@ namespace VideoDecoders.MediaFoundation.Mkv
 
         public string SegmentFilename { get; set; }
         public ulong TimecodeScale { get; set; }
-        public double Duration { get; set; }
+        public ulong Duration { get; set; }
         public DateTime? DateUTC { get; set; }
         public string Title { get; set; }
     }

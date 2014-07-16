@@ -12,5 +12,7 @@ namespace VideoDecoders.MediaFoundation.Mkv
         IMFStreamDescriptor Descriptor { get; }
 
         void ProcessSample();
+
+        IMFMediaBuffer CreateBufferFromBlock(int blockDataSize, Func<byte[], int, int, int> readBlockDataFunc);
     }
 }

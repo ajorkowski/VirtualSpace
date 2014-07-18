@@ -130,8 +130,10 @@ namespace VideoDecoders.MediaFoundation.Mkv
             return buffer;
         }
 
-        public void ProcessSample()
+        public bool ProcessSample()
         {
+            if (_tokenQueue.IsEmpty) { return false; }
+
             // Only dequeue one token at a time...
             object token;
             if (_tokenQueue.TryDequeue(out token))
@@ -141,7 +143,7 @@ namespace VideoDecoders.MediaFoundation.Mkv
                 {
                     QueueEvent(MediaEventType.MEEndOfStream, Guid.Empty, S_Ok, new PropVariant());
                     EndAndPurgeStream();
-                    return;
+                    return false;
                 }
 
                 if (token != null)
@@ -150,7 +152,10 @@ namespace VideoDecoders.MediaFoundation.Mkv
                 }
 
                 QueueEvent(MediaEventType.MEMediaSample, Guid.Empty, S_Ok, new PropVariant(sample));
+                return true;
             }
+
+            return false;
         }
 
         public int RequestSample(object pToken)
@@ -160,6 +165,7 @@ namespace VideoDecoders.MediaFoundation.Mkv
             if (_endOfStream) { return MFError.MF_E_END_OF_STREAM; }
 
             _tokenQueue.Enqueue(pToken);
+            _mediaSource.HasFrameToProcess();
 
             return S_Ok;
         }

@@ -8,6 +8,7 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
+using System.Security;
 using System.Threading;
 using System.Threading.Tasks;
 using VideoDecoders.MediaFoundation;
@@ -28,6 +29,9 @@ namespace VirtualSpace.Platform.Windows.Video
         private SharpDX.Direct3D11.Device _device;
         private SharpDX.Direct3D11.DeviceContext _deviceContext;
         private SharpDX.Direct3D11.Texture2D _surface;
+        private SharpDX.Direct3D9.DeviceEx _d9Device;
+        private SharpDX.Direct3D9.Texture _d9Surface;
+        private IntPtr _d9SurfaceSharedHandle;
         private ConcurrentBag<VideoFrame> _unusedFrames;
         private ConcurrentQueue<VideoFrame> _bufferedFrames;
         private KeyedMutex _mutex;
@@ -66,7 +70,7 @@ namespace VirtualSpace.Platform.Windows.Video
             var url = new Uri(file, UriKind.RelativeOrAbsolute);
 
             // Create Source Reader
-            var manager = SetupModeAndCreateManager();
+            var manager = SetupModeAndCreateManager(IntPtr.Zero);
             using(var attr = new MediaAttributes())
             {
                 if (manager != null)
@@ -154,6 +158,11 @@ namespace VirtualSpace.Platform.Windows.Video
                 Usage = ResourceUsage.Default
             }));
 
+            if (_mode == VideoMode.Dx9)
+            {
+                _d9Surface = AddDisposable(new SharpDX.Direct3D9.Texture(_d9Device, _width, _height, 1, SharpDX.Direct3D9.Usage.RenderTarget, SharpDX.Direct3D9.Format.A8R8G8B8, SharpDX.Direct3D9.Pool.Default, ref _d9SurfaceSharedHandle));
+            }
+
             using (var sharedResource = renderTexture.QueryInterface<SharpDX.DXGI.Resource1>())
             {
                 //Get texture to be used by our media engine
@@ -171,10 +180,11 @@ namespace VirtualSpace.Platform.Windows.Video
                     desc.OptionFlags = ResourceOptionFlags.None;
                     desc.Usage = ResourceUsage.Dynamic;
                     break;
+                case VideoMode.Dx9:
+                    desc.OptionFlags = ResourceOptionFlags.None;
+                    break;
                 case VideoMode.Dx11:
                     desc.OptionFlags = ResourceOptionFlags.None;
-                    desc.CpuAccessFlags = CpuAccessFlags.None;
-                    desc.Usage = ResourceUsage.Default;
                     break;
             }
 
@@ -331,6 +341,9 @@ namespace VirtualSpace.Platform.Windows.Video
                                 case VideoMode.Dx11:
                                     QueueSampleDx11(sample, unused.Texture);
                                     break;
+                                case VideoMode.Dx9:
+                                    QueueSampleDx9(sample, unused.Texture);
+                                    break;
                                 case VideoMode.Software:
                                     QueueSampleSoftware(sample, unused.Texture);
                                     break;
@@ -364,20 +377,40 @@ namespace VirtualSpace.Platform.Windows.Video
                 dxgi.GetResource(typeof(SharpDX.Direct3D11.Texture2D).GUID, out texture2d);
                 using (var tex = new SharpDX.Direct3D11.Texture2D(texture2d))
                 {
-                    try
-                    {
-                        var result = _mutex.Acquire(0, 100);
+                    _deviceContext.CopyResource(tex, bufferText);
+                }
+            }
+        }
 
-                        if (result == Result.Ok)
-                        {
-                            _deviceContext.CopyResource(tex, bufferText);
-                            _mutex.Release(0);
-                        }
-                    }
-                    catch(SharpDXException)
+        private void QueueSampleDx9(Sample sample, Texture2D bufferText)
+        {
+            using (var buffer = sample.GetBufferByIndex(0))
+            {
+                IntPtr surfacePtr;
+                MediaFactory.GetService(buffer, MediaServiceKeys.Buffer, typeof(SharpDX.Direct3D9.Surface).GUID, out surfacePtr);
+
+                // Copy to sharable texture...
+                using (var surface = new SharpDX.Direct3D9.Surface(surfacePtr))
+                using (var tempSurface = _d9Surface.GetSurfaceLevel(0))
+                {
+                    _d9Device.StretchRectangle(surface, null, tempSurface, null, SharpDX.Direct3D9.TextureFilter.None);
+                }
+
+                // We have to wait for the copy... yawn :(
+                using (var query = new SharpDX.Direct3D9.Query(_d9Device, SharpDX.Direct3D9.QueryType.Event))
+                {
+                    query.Issue(SharpDX.Direct3D9.Issue.End);
+                    bool temp;
+                    while (!query.GetData(out temp, true) || !temp)
                     {
-                        // TODO: Maybe do not ignore this?
                     }
+                }
+
+                // Copy to Dx11 texture...
+                using (var sharedResource = _device.OpenSharedResource<SharpDX.Direct3D11.Resource>(_d9SurfaceSharedHandle))
+                using (var sharedTexture = sharedResource.QueryInterface<Texture2D>())
+                {
+                    _deviceContext.CopyResource(sharedTexture, bufferText);
                 }
             }
         }
@@ -390,20 +423,13 @@ namespace VirtualSpace.Platform.Windows.Video
                 int currentLength;
                 var dataPtr = buffer.Lock(out maxLength, out currentLength);
                 var box = _deviceContext.MapSubresource(bufferText, 0, MapMode.WriteDiscard, SharpDX.Direct3D11.MapFlags.None);
-
-                var testData = new byte[maxLength];
-                GCHandle pinnedArray = GCHandle.Alloc(testData, GCHandleType.Pinned);
-                IntPtr pointer = pinnedArray.AddrOfPinnedObject();
-                Utilities.CopyMemory(pointer, dataPtr, currentLength);
-                pinnedArray.Free();
-
                 Utilities.CopyMemory(box.DataPointer, dataPtr, currentLength);
                 _deviceContext.UnmapSubresource(bufferText, 0);
                 buffer.Unlock();
             }
         }
 
-        private ComObject SetupModeAndCreateManager()
+        private ComObject SetupModeAndCreateManager(IntPtr hWnd)
         {
             var dx11Manager = TryCreateDx11Manager();
             if (dx11Manager != null)
@@ -412,11 +438,82 @@ namespace VirtualSpace.Platform.Windows.Video
                 return dx11Manager;
             }
 
+            var dx9Manager = TryCreateDx9Manager(hWnd);
+            if (dx9Manager != null)
+            {
+                _mode = VideoMode.Dx9;
+                return dx9Manager;
+            }
+
             // Fallback software device
             _device = AddDisposable(new SharpDX.Direct3D11.Device(DriverType.Hardware, DeviceCreationFlags.BgraSupport));
             _deviceContext = AddDisposable(_device.ImmediateContext);
             _mode = VideoMode.Software;
             return null;
+        }
+
+        private ComObject TryCreateDx9Manager(IntPtr hWnd)
+        {
+            ComObject manager = null;
+            try
+            {
+                using (var d3d9 = new SharpDX.Direct3D9.Direct3DEx())
+                {
+                    if (!d3d9.CheckDeviceFormatConversion(0, SharpDX.Direct3D9.DeviceType.Hardware, SharpDX.Direct3D9.D3DX.MakeFourCC((byte)'N', (byte)'V', (byte)'1', (byte)'2'), SharpDX.Direct3D9.Format.X8R8G8B8))
+                    {
+                        return null;
+                    }
+
+                    _d9Device = AddDisposable(new SharpDX.Direct3D9.DeviceEx(d3d9, 0, SharpDX.Direct3D9.DeviceType.Hardware, hWnd, SharpDX.Direct3D9.CreateFlags.FpuPreserve | SharpDX.Direct3D9.CreateFlags.Multithreaded | SharpDX.Direct3D9.CreateFlags.MixedVertexProcessing, new SharpDX.Direct3D9.PresentParameters
+                    {
+                        BackBufferWidth = 1,
+                        BackBufferHeight = 1,
+                        BackBufferFormat = SharpDX.Direct3D9.Format.Unknown,
+                        BackBufferCount = 1,
+                        SwapEffect = SharpDX.Direct3D9.SwapEffect.Discard,
+                        DeviceWindowHandle = hWnd,
+                        Windowed = true,
+                        PresentFlags = SharpDX.Direct3D9.PresentFlags.Video
+                    }));
+
+                    int resetToken;
+                    IDirect3DDeviceManager9 dxManager;
+                    DXVA2CreateDirect3DDeviceManager9(out resetToken, out dxManager);
+
+                    dxManager.ResetDevice(_d9Device.NativePointer, resetToken);
+
+                    manager = AddDisposable(new ComObject(dxManager));
+                }
+
+                // Use default dx11 devices that will be able to chat to dx9?
+                _device = AddDisposable(new SharpDX.Direct3D11.Device(DriverType.Hardware, DeviceCreationFlags.BgraSupport));
+                _deviceContext = AddDisposable(_device.ImmediateContext);
+            }
+            catch (Exception)
+            {
+                if (manager != null)
+                {
+                    _toDispose.Remove(manager);
+                    manager.Dispose();
+                    manager = null;
+                }
+
+                if(_d9Device != null)
+                {
+                    _toDispose.Remove(_d9Device);
+                    _d9Device.Dispose();
+                    _d9Device = null;
+                }
+
+                if (_device != null)
+                {
+                    _toDispose.Remove(_device);
+                    _device.Dispose();
+                    _device = null;
+                }
+            }
+
+            return manager;
         }
 
         private DXGIDeviceManager TryCreateDx11Manager()
@@ -465,6 +562,8 @@ namespace VirtualSpace.Platform.Windows.Video
             {
                 case VideoMode.Dx11:
                     return VideoFormatGuids.Argb32;
+                case VideoMode.Dx9:
+                    return VideoFormatGuids.NV12;
                 case VideoMode.Software:
                     return VideoFormatGuids.Rgb32;
                 default:
@@ -513,6 +612,7 @@ namespace VirtualSpace.Platform.Windows.Video
         private enum VideoMode
         {
             Software,
+            Dx9,
             Dx11
         }
 
@@ -648,5 +748,30 @@ namespace VirtualSpace.Platform.Windows.Video
             a1 = (int)(a & uint.MaxValue);
             a2 = (int)(a >> 32);
         }
+
+        /**********************************************************
+         * COM Imports only used here...
+         * ********************************************************/
+        [ComImport, System.Security.SuppressUnmanagedCodeSecurity,
+	    Guid("a0cade0f-06d5-4cf4-a1c7-f3cdd725aa75"),
+	    InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+        public interface IDirect3DDeviceManager9
+	    {
+	        void ResetDevice(
+	            [In]  IntPtr pDevice,
+	            [In]  int resetToken);
+	
+	        void Junk2();
+	        void Junk3();
+	        void Junk4();
+	        void Junk5();
+	        void Junk6();
+	    }
+
+        [DllImport("dxva2.DLL", ExactSpelling = true, PreserveSig = false), SuppressUnmanagedCodeSecurity]
+	        public extern static void DXVA2CreateDirect3DDeviceManager9(
+	            out int pResetToken,
+	            out IDirect3DDeviceManager9 ppDXVAManager
+	            );
     }
 }

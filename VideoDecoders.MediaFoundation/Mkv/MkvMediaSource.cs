@@ -199,6 +199,11 @@ namespace VideoDecoders.MediaFoundation.Mkv
             }
         }
 
+        public void HasFrameToProcess()
+        {
+            _commandReset.Set();
+        }
+
         private void ProcessCommandQueue()
         {
             while (_currentState != MkvState.Shutdown)
@@ -222,8 +227,10 @@ namespace VideoDecoders.MediaFoundation.Mkv
 
                 if(_currentState == MkvState.Play)
                 {
-                    LoadNextFrame();
-                    continue;
+                    if (LoadNextFrame())
+                    {
+                        continue;
+                    }
                 }
 
                 // We are stopped pretty much... we have nothing to do... so just wait instead of wasting cycles
@@ -281,15 +288,16 @@ namespace VideoDecoders.MediaFoundation.Mkv
             }
         }
 
-        private void LoadNextFrame()
+        private bool LoadNextFrame()
         {
             bool isEop = true;
+            bool hasUpdated = false;
             foreach (var t in _tracks)
             {
                 if (t.IsSelected && !t.IsEOS)
                 {
                     isEop = false;
-                    t.ProcessSample();
+                    hasUpdated = t.ProcessSample() || hasUpdated;
                 }
             }
 
@@ -297,7 +305,10 @@ namespace VideoDecoders.MediaFoundation.Mkv
             {
                 _currentState = MkvState.EndOfPresentation;
                 QueueEvent(MediaEventType.MEEndOfPresentation, Guid.Empty, S_Ok, new PropVariant());
+                hasUpdated = true;
             }
+
+            return hasUpdated;
         }
 
         private void SetEvent(MkvStateCommand command)

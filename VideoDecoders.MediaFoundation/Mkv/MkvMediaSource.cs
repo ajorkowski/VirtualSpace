@@ -42,8 +42,12 @@ namespace VideoDecoders.MediaFoundation.Mkv
             {
                 if (t.TrackType == TrackType.Video)
                 {
-                    var newTrack = new MkvVideoTrack(t, this);
-                    _tracks.Add(newTrack);
+                    _tracks.Add(new MkvVideoTrack(t, this));
+                }
+
+                if (t.TrackType == TrackType.Audio)
+                {
+                    _tracks.Add(new MkvAudioTrack(t, this));
                 }
             }
 

@@ -1,5 +1,6 @@
 ﻿using MediaFoundation;
 using System;
+using System.IO;
 
 namespace VideoDecoders.MediaFoundation.Mkv
 {
@@ -44,7 +45,37 @@ namespace VideoDecoders.MediaFoundation.Mkv
 
         public override IMFMediaBuffer CreateBufferFromBlock(int blockDataSize, Func<byte[], int, int, int> readBlockDataFunc)
         {
-            throw new NotImplementedException();
+            IMFMediaBuffer buffer;
+            TestSuccess("Could not create media buffer", MFExtern.MFCreateMemoryBuffer(blockDataSize, out buffer));
+
+            int currentLength;
+            IntPtr bufferPtr;
+            TestSuccess("Could not lock media buffer", buffer.Lock(out bufferPtr, out blockDataSize, out currentLength));
+
+            unsafe
+            {
+                using (var buffStream = new UnmanagedMemoryStream((byte*)bufferPtr.ToPointer(), blockDataSize, blockDataSize, FileAccess.Write))
+                {
+                    var sharedBuffer = new byte[2048];
+                    while (blockDataSize > 0)
+                    {
+                        int r = readBlockDataFunc(sharedBuffer, 0, Math.Min(blockDataSize, 2048));
+                        if (r < 0)
+                        {
+                            throw new EndOfStreamException();
+                        }
+
+                        buffStream.Write(sharedBuffer, 0, r);
+                        blockDataSize -= r;
+                        currentLength += r;
+                    }
+                }
+            }
+
+            TestSuccess("Could not set media buffer length", buffer.SetCurrentLength(currentLength));
+            TestSuccess("Could not unlock media buffer", buffer.Unlock());
+
+            return buffer;
         }
     }
 }

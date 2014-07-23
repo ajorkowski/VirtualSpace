@@ -33,11 +33,21 @@ namespace VideoDecoders.MediaFoundation.Mkv
             var mediaType = CreateMediaType(entry);
             TestSuccess("Could not create stream descriptor", MFExtern.MFCreateStreamDescriptor((int)entry.TrackNumber, 1, new IMFMediaType[] { mediaType }, out _descriptor));
 
+            // Add Stream descriptor attributes from the track information
+            if (!string.IsNullOrWhiteSpace(entry.Name))
+            {
+                _descriptor.SetString(MFAttributesClsid.MF_SD_STREAM_NAME, entry.Name);
+            }
+
+            if (!string.IsNullOrWhiteSpace(entry.Language))
+            {
+                _descriptor.SetString(MFAttributesClsid.MF_SD_LANGUAGE, entry.Language);
+            }
+
             IMFMediaTypeHandler typeHandler;
             _descriptor.GetMediaTypeHandler(out typeHandler);
 
             typeHandler.SetCurrentMediaType(mediaType);
-
         }
 
         protected abstract IMFMediaType CreateMediaType(TrackEntry entry);

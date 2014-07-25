@@ -81,6 +81,7 @@
     <Compile Include="Rendering\Screen\ScreenRenderer.cs" />
     <Compile Include="Desktop\DesktopDX11.cs" />
     <Compile Include="Desktop\DesktopGdi.cs" />
+    <Compile Include="Video\AudioStream.cs" />
     <Compile Include="Video\MediaAndDeviceManager.cs" />
     <Compile Include="Video\VideoDevice.cs" />
     <Compile Include="Video\VideoSource.cs" />

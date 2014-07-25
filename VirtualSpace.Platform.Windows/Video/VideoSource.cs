@@ -13,6 +13,7 @@ namespace VirtualSpace.Platform.Windows.Video
     internal sealed class VideoSource : IVideo, IScreenSource
     {
         private const int MF_SOURCE_READER_FIRST_VIDEO_STREAM = unchecked((int)(0xFFFFFFFC));
+        private const int MF_SOURCE_READER_FIRST_AUDIO_STREAM = unchecked((int)(0xFFFFFFFD));
         private const int MF_SOURCE_READER_ALL_STREAMS = unchecked((int)(0xFFFFFFFE));
 
         private readonly List<IDisposable> _toDispose;
@@ -26,6 +27,7 @@ namespace VirtualSpace.Platform.Windows.Video
 
         private VideoDevice _videoDevice;
         private VideoStream _videoStream;
+        private AudioStream _audioStream;
 
         private bool _canSeek;
         private TimeSpan _duration;
@@ -69,6 +71,7 @@ namespace VirtualSpace.Platform.Windows.Video
             // Enable default streams...
             _reader.SetStreamSelection(MF_SOURCE_READER_ALL_STREAMS, false);
             _reader.SetStreamSelection(MF_SOURCE_READER_FIRST_VIDEO_STREAM, true);
+            _reader.SetStreamSelection(MF_SOURCE_READER_FIRST_AUDIO_STREAM, true);
 
             // Grab out some metadata...
             _canSeek = GetCanSeek(_reader);
@@ -135,6 +138,7 @@ namespace VirtualSpace.Platform.Windows.Video
 
             // Create the default video stream...
             _videoStream = AddDisposable(new VideoStream(_reader, _videoDevice, MF_SOURCE_READER_FIRST_VIDEO_STREAM));
+            _audioStream = AddDisposable(new AudioStream(_reader, MF_SOURCE_READER_FIRST_AUDIO_STREAM));
             
             _state = VideoState.Paused;
         }

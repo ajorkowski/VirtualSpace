@@ -26,6 +26,7 @@ namespace VideoDecoders.MediaFoundation.Mkv
             switch (entry.CodecID)
             {
                 case "A_MPEG/L2":
+                    // http://msdn.microsoft.com/en-us/library/windows/desktop/dd390676(v=vs.85).aspx
                     subtype = MFMediaType.MPEG;
                     break;
                 default:

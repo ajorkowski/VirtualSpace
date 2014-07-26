@@ -1,14 +1,20 @@
 ﻿using MediaFoundation;
 using System;
 using System.IO;
+using System.Text;
+using System.Linq;
 
 namespace VideoDecoders.MediaFoundation.Mkv
 {
     public class MkvAudioTrack : MkvBaseTrack
     {
+        private readonly byte[] _sharedBuffer;
+
         public MkvAudioTrack(TrackEntry entry, MkvMediaSource mediaSource)
             : base(entry, mediaSource)
         {
+            _sharedBuffer = new byte[2048];
+
             if (entry.TrackType != TrackType.Audio)
             {
                 throw new InvalidOperationException("Only audio tracks should be here");
@@ -35,8 +41,8 @@ namespace VideoDecoders.MediaFoundation.Mkv
 
             TestSuccess("Could not set audio subtype", type.SetGUID(MFAttributesClsid.MF_MT_SUBTYPE, subtype));
 
-            TestSuccess("Could not set number of channels", type.SetUINT32(MFAttributesClsid.MF_MT_AUDIO_NUM_CHANNELS, (int)entry.Audio.Channels));
-            TestSuccess("Could not set the sample rate", type.SetUINT32(MFAttributesClsid.MF_MT_AUDIO_SAMPLES_PER_SECOND, (int)entry.Audio.SamplingFrequency));
+            //TestSuccess("Could not set number of channels", type.SetUINT32(MFAttributesClsid.MF_MT_AUDIO_NUM_CHANNELS, (int)entry.Audio.Channels));
+            //TestSuccess("Could not set the sample rate", type.SetUINT32(MFAttributesClsid.MF_MT_AUDIO_SAMPLES_PER_SECOND, (int)entry.Audio.SamplingFrequency));
 
             // TODO: Channel Mask?
             //TestSuccess("Could not set channel mask", type.SetUINT32(MFAttributesClsid.MF_MT_AUDIO_CHANNEL_MASK, (int)entry.Audio.SamplingFrequency));
@@ -57,16 +63,17 @@ namespace VideoDecoders.MediaFoundation.Mkv
             {
                 using (var buffStream = new UnmanagedMemoryStream((byte*)bufferPtr.ToPointer(), blockDataSize, blockDataSize, FileAccess.Write))
                 {
-                    var sharedBuffer = new byte[2048];
                     while (blockDataSize > 0)
                     {
-                        int r = readBlockDataFunc(sharedBuffer, 0, Math.Min(blockDataSize, 2048));
+                        int r = readBlockDataFunc(_sharedBuffer, 0, Math.Min(blockDataSize, 2048));
                         if (r < 0)
                         {
                             throw new EndOfStreamException();
                         }
 
-                        buffStream.Write(sharedBuffer, 0, r);
+                        //Console.WriteLine(string.Join(" ", _sharedBuffer.Take(r).Select(b => byteToBitsString(b))));
+
+                        buffStream.Write(_sharedBuffer, 0, r);
                         blockDataSize -= r;
                         currentLength += r;
                     }
@@ -78,5 +85,21 @@ namespace VideoDecoders.MediaFoundation.Mkv
 
             return buffer;
         }
+
+        //private string byteToBitsString(byte byteIn)
+        //{
+        //    var bitsString = new StringBuilder(8);
+
+        //    bitsString.Append(Convert.ToString((byteIn / 128) % 2));
+        //    bitsString.Append(Convert.ToString((byteIn / 64) % 2));
+        //    bitsString.Append(Convert.ToString((byteIn / 32) % 2));
+        //    bitsString.Append(Convert.ToString((byteIn / 16) % 2));
+        //    bitsString.Append(Convert.ToString((byteIn / 8) % 2));
+        //    bitsString.Append(Convert.ToString((byteIn / 4) % 2));
+        //    bitsString.Append(Convert.ToString((byteIn / 2) % 2));
+        //    bitsString.Append(Convert.ToString((byteIn / 1) % 2));
+
+        //    return bitsString.ToString();
+        //}
     }
 }

@@ -1,31 +1,45 @@
 ﻿using SharpDX;
 using SharpDX.DXGI;
+using SharpDX.Multimedia;
 using SharpDX.Toolkit;
 using SharpDX.Toolkit.Graphics;
+using SharpDX.X3DAudio;
+using SharpDX.XAPO.Fx;
+using SharpDX.XAudio2;
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using VirtualSpace.Core;
 using VirtualSpace.Core.Renderer.Screen;
 using VirtualSpace.Platform.Windows.Rendering.Providers;
+using VirtualSpace.Platform.Windows.Video;
 
 namespace VirtualSpace.Platform.Windows.Rendering.Screen
 {
     internal sealed class ScreenRenderer : GameSystem, IScreen
     {
-        private ICameraProvider _cameraService;
-        private BasicEffect _basicEffect;
+        private readonly ICameraProvider _cameraService;
+        private readonly IScreenSource _source;
+        private readonly Dictionary<Speakers, SpeakerOutput> _speakerOutputs;
 
+        private BasicEffect _basicEffect;
         private GeometricPrimitive _plane;
         private SharpDX.Direct3D11.ShaderResourceView _planeShaderView;
         private Matrix _planeTransform;
-
-        private IScreenSource _source;
         private KeyedMutex _renderMutex;
+
+        private X3DAudio _x3DAudio;
+        private Listener _audioListener;
+        private DspSettings _dspSettings;
+        private bool _stereoVirtualisation;
+        private float[] _lowFreqOutput;
 
         public ScreenRenderer(Game game, ICameraProvider camera, IScreenSource source, float screenSize, float curveRadius)
             : base(game)
         {
             _source = source;
             _cameraService = camera;
+            _speakerOutputs = new Dictionary<Speakers, SpeakerOutput>();
             Visible = true;
             Enabled = true;
             ScreenSize = screenSize;
@@ -45,13 +59,17 @@ namespace VirtualSpace.Platform.Windows.Rendering.Screen
         {
             base.LoadContent();
 
-            var screenTexture = ToDisposeContent(_source.GetOutputRenderTexture(GraphicsDevice));
-            var desc = screenTexture.Description;
+            var output = _source.GetOutput(GraphicsDevice);
+            
+            /*************************************************
+             * Setup Video
+             * *******************************************/
+            var desc = output.Texture.Description;
 
             // Render mutex is optional (depends on the returned texture)
             if ((desc.OptionFlags & SharpDX.Direct3D11.ResourceOptionFlags.SharedKeyedmutex) == SharpDX.Direct3D11.ResourceOptionFlags.SharedKeyedmutex)
             {
-                _renderMutex = ToDisposeContent(screenTexture.QueryInterface<KeyedMutex>());
+                _renderMutex = ToDisposeContent(output.Texture.QueryInterface<KeyedMutex>());
             }
             else
             {
@@ -62,7 +80,7 @@ namespace VirtualSpace.Platform.Windows.Rendering.Screen
             _basicEffect.TextureEnabled = true;
             _basicEffect.LightingEnabled = false;
 
-            _planeShaderView = ToDisposeContent(new SharpDX.Direct3D11.ShaderResourceView(GraphicsDevice, screenTexture, new SharpDX.Direct3D11.ShaderResourceViewDescription
+            _planeShaderView = ToDisposeContent(new SharpDX.Direct3D11.ShaderResourceView(GraphicsDevice, output.Texture, new SharpDX.Direct3D11.ShaderResourceViewDescription
             {
                 Format = desc.Format,
                 Dimension = SharpDX.Direct3D.ShaderResourceViewDimension.Texture2D,
@@ -82,6 +100,103 @@ namespace VirtualSpace.Platform.Windows.Rendering.Screen
             _planeTransform = Matrix.Scaling(screenWidth / (float)desc.Width);
             _basicEffect.TextureView = _planeShaderView;
             _basicEffect.World = _planeTransform;
+
+            /********************************************
+             * SETUP AUDIO
+             * *****************************************/
+            if(output.Audio != null)
+            {
+                var distanceBase = screenWidth / 3f;
+                output.Audio.SetVolume((float)Math.Pow(2, distanceBase) * 4);
+
+                _x3DAudio = MediaAndDeviceManager.Current.X3DAudioEngine;
+                var outputChannels = MediaAndDeviceManager.Current.MasterVoice.VoiceDetails.InputChannelCount;
+                if(outputChannels != 2 && outputChannels != 6)
+                {
+                    throw new InvalidOperationException("Only support Stereo or 5.1 output sound currently");
+                }
+                _stereoVirtualisation = outputChannels == 2;
+
+                var sampleRate = output.Audio.VoiceDetails.InputSampleRate;
+
+                var sourceAudioChannels = output.Audio.VoiceDetails.InputChannelCount;
+                if (sourceAudioChannels != 1 && sourceAudioChannels != 2 && sourceAudioChannels != 6)
+                {
+                    throw new InvalidOperationException("Only support Mono, Stereo, 5.1 input sound currently");
+                }
+
+                _speakerOutputs.Add(Speakers.FrontLeft, CreateSpeakerOutput(sampleRate, distanceBase));
+                _speakerOutputs.Add(Speakers.FrontRight, CreateSpeakerOutput(sampleRate, distanceBase));
+
+                if (sourceAudioChannels > 6)
+                {
+                    _speakerOutputs.Add(Speakers.FrontCenter, CreateSpeakerOutput(sampleRate, distanceBase));
+                    _speakerOutputs.Add(Speakers.BackLeft, CreateSpeakerOutput(sampleRate, distanceBase));
+                    _speakerOutputs.Add(Speakers.BackRight, CreateSpeakerOutput(sampleRate, distanceBase));
+
+                    // Ignore LF if we only have headphones...
+                    if (!_stereoVirtualisation)
+                    {
+                        _speakerOutputs.Add(Speakers.LowFrequency, CreateSpeakerOutput(sampleRate, distanceBase));
+                    }
+                }
+
+                output.Audio.SetOutputVoices(_speakerOutputs.Values.Select(v => new VoiceSendDescriptor(v.Voice)).ToArray());
+
+                foreach(var o in _speakerOutputs)
+                {
+                    var levelMatrix = new float[sourceAudioChannels];
+                    switch(o.Key)
+                    {
+                        case Speakers.FrontLeft:
+                            levelMatrix[0] = 1.0f;
+                            break;
+                        case Speakers.FrontRight:
+                            levelMatrix[sourceAudioChannels == 1 ? 0 : 1] = 1.0f; // Mono sound comes out of both channels
+                            break;
+                        case Speakers.FrontCenter:
+                            levelMatrix[2] = 1.0f;
+                            break;
+                        case Speakers.LowFrequency:
+                            levelMatrix[3] = 1.0f;
+                            break;
+                        case Speakers.BackLeft:
+                            levelMatrix[4] = 1.0f;
+                            break;
+                        case Speakers.BackRight:
+                            levelMatrix[5] = 1.0f;
+                            break;
+                        default:
+                            throw new InvalidOperationException("Bad speaker output configuration");
+                    }
+                    output.Audio.SetOutputMatrix(o.Value.Voice, sourceAudioChannels, 1, levelMatrix);
+                }
+
+                _dspSettings = new DspSettings(1, outputChannels);
+                _audioListener = new Listener
+                {
+                    OrientFront = new Vector3(0, 0, 1),
+                    OrientTop = new Vector3(0, 1, 0),
+                    Position = new Vector3(0, 0, 0),
+                    Velocity = new Vector3(0, 0, 0)
+                };
+
+                if(_stereoVirtualisation)
+                {
+                    SetupStereoVirtualisation(sampleRate);
+                }
+                else
+                {
+                    _lowFreqOutput = new float[6] { 0, 0, 0, 1f, 0, 0 };
+                }
+            }
+        }
+
+        protected override void UnloadContent()
+        {
+            base.UnloadContent();
+
+            _speakerOutputs.Clear();
         }
 
         public override void Update(GameTime gameTime)
@@ -91,6 +206,55 @@ namespace VirtualSpace.Platform.Windows.Rendering.Screen
             _source.Update(gameTime);
             _basicEffect.View = _cameraService.View;
             _basicEffect.Projection = _cameraService.Projection;
+
+            if (_speakerOutputs.Count > 0)
+            {
+                // For 3D calcs for audio... easier to use model space
+                _audioListener.Position = Matrix.Invert(_cameraService.View).TranslationVector;
+                _audioListener.OrientFront = _cameraService.View.Forward;
+                _audioListener.OrientTop = _cameraService.View.Up;
+
+                foreach (var o in _speakerOutputs)
+                {
+                    if (_stereoVirtualisation)
+                    {
+                        // Calculate X3DAudio settings
+                        _x3DAudio.Calculate(_audioListener, o.Value.Emitter, CalculateFlags.Matrix | CalculateFlags.Delay, _dspSettings);
+
+                        o.Value.LeftDSP[0] = _dspSettings.MatrixCoefficients[0];
+                        o.Value.RightDSP[1] = _dspSettings.MatrixCoefficients[1];
+
+                        var baseDelay = _dspSettings.EmitterToListenerDistance / X3DAudio.SpeedOfSound * 1000;
+                        o.Value.Delay[0].Delay = baseDelay + _dspSettings.DelayTimes[0];
+                        o.Value.Delay[1].Delay = baseDelay + _dspSettings.DelayTimes[1];
+
+                        // Modify XAudio2 source voice settings
+                        o.Value.Voice.SetOutputMatrix(o.Value.LeftOut, 1, 2, o.Value.LeftDSP);
+                        o.Value.Voice.SetOutputMatrix(o.Value.RightOut, 1, 2, o.Value.RightDSP);
+                        o.Value.LeftOut.SetEffectParameters<AudioDelayParam>(0, o.Value.Delay[0]);
+                        o.Value.RightOut.SetEffectParameters<AudioDelayParam>(0, o.Value.Delay[1]);
+                    }
+                    else
+                    {
+                        if (o.Key == Speakers.LowFrequency)
+                        {
+                            // Calculate X3DAudio settings
+                            _x3DAudio.Calculate(_audioListener, o.Value.Emitter, CalculateFlags.Matrix | CalculateFlags.RedirectToLfe, _dspSettings);
+
+                            _lowFreqOutput[3] = _dspSettings.MatrixCoefficients[3];
+                            o.Value.Voice.SetOutputMatrix(1, 6, _lowFreqOutput);
+                        }
+                        else
+                        {
+                            // Calculate X3DAudio settings
+                            _x3DAudio.Calculate(_audioListener, o.Value.Emitter, CalculateFlags.Matrix, _dspSettings);
+
+                            // Modify XAudio2 source voice settings
+                            o.Value.Voice.SetOutputMatrix(1, 6, _dspSettings.MatrixCoefficients);
+                        }
+                    }
+                }
+            }
         }
 
         public override void Draw(GameTime gameTime)
@@ -121,6 +285,51 @@ namespace VirtualSpace.Platform.Windows.Rendering.Screen
 
         public float ScreenSize { get; set; }
         public float CurveRadius { get; set; }
+
+        private SpeakerOutput CreateSpeakerOutput(int sampleRate, float minDistance)
+        {
+            var voice = ToDisposeContent(new SubmixVoice(MediaAndDeviceManager.Current.AudioEngine, 1, sampleRate));
+            voice.SetVolume((float)(1.0 / Math.Pow(2, minDistance)));
+
+            return new SpeakerOutput
+            {
+                Voice = voice,
+                Emitter = new Emitter
+                {
+                    ChannelCount = 1,
+                    CurveDistanceScaler = minDistance,
+                    OrientFront = new Vector3(0, 0, 1),
+                    OrientTop = new Vector3(0, 1, 0),
+                    Position = new Vector3(0, 0, 0),
+                    Velocity = new Vector3(0, 0, 0)
+                }
+            };
+        }
+
+        private void SetupStereoVirtualisation(int sampleRate)
+        {
+            foreach(var o in _speakerOutputs)
+            {
+                var leftVoice = new SubmixVoice(MediaAndDeviceManager.Current.AudioEngine, 2, sampleRate, SubmixVoiceFlags.None, 10);
+                ToDisposeContent(new Disposable(() => { leftVoice.DisableEffect(0); leftVoice.DestroyVoice(); leftVoice.Dispose(); }));
+
+                var rightVoice = new SubmixVoice(MediaAndDeviceManager.Current.AudioEngine, 2, sampleRate, SubmixVoiceFlags.None, 10);
+                ToDisposeContent(new Disposable(() => { leftVoice.DisableEffect(0); rightVoice.DestroyVoice(); rightVoice.Dispose(); }));
+
+                o.Value.LeftOut = leftVoice;
+                o.Value.RightOut = rightVoice;
+                o.Value.Voice.SetOutputVoices(new VoiceSendDescriptor(o.Value.LeftOut), new VoiceSendDescriptor(o.Value.RightOut));
+
+                o.Value.LeftDSP = new float[2] { 1f, 0f };
+                o.Value.RightDSP = new float[2] { 0f, 1f };
+                o.Value.Delay = new AudioDelayParam[2] { new AudioDelayParam { Delay = 0 }, new AudioDelayParam { Delay = 0 } };
+
+                o.Value.LeftOut.SetEffectChain(new EffectDescriptor(new AudioDelayEffect(1000)));
+                o.Value.LeftOut.SetEffectParameters<AudioDelayParam>(0, o.Value.Delay[0]);
+                o.Value.RightOut.SetEffectChain(new EffectDescriptor(new AudioDelayEffect(1000)));
+                o.Value.RightOut.SetEffectParameters<AudioDelayParam>(0, o.Value.Delay[1]);
+            }
+        }
 
         private static GeometricPrimitive CreateCurvedSurface(GraphicsDevice device, float distance, float width, float height, int tessellation)
         {
@@ -181,6 +390,19 @@ namespace VirtualSpace.Platform.Windows.Rendering.Screen
                 textCoord = new Vector2(1 - i * invTes, 1);
                 vertices[currentVertex++] = new VertexPositionNormalTexture(position, normal, textCoord);
             }
+        }
+
+        private sealed class SpeakerOutput
+        {
+            public SubmixVoice Voice { get; set; }
+            public Emitter Emitter { get; set; }
+
+            // For 2 channel delay virtualisation...
+            public SubmixVoice LeftOut { get; set; }
+            public SubmixVoice RightOut { get; set; }
+            public float[] LeftDSP { get; set; }
+            public float[] RightDSP { get; set; }
+            public AudioDelayParam[] Delay { get; set; }
         }
     }
 }

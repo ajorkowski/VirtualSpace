@@ -50,7 +50,7 @@ namespace VirtualSpace.Platform.Windows.Screen
             AddDisposable(new Disposable(() => { DeleteObject(handle); }));
         }
 
-        public Texture2D GetOutputRenderTexture(SharpDX.Direct3D11.Device device)
+        public ScreenOutput GetOutput(SharpDX.Direct3D11.Device device)
         {
             // Base description
             var sharedDesc = new Texture2DDescription
@@ -85,7 +85,10 @@ namespace VirtualSpace.Platform.Windows.Screen
             _isRunning = true;
             _captureLoop = Task.Run(() => CaptureLoop());
 
-            return renderTexture;
+            return new ScreenOutput
+            {
+                Texture = renderTexture
+            };
         }
 
         public void Update(SharpDX.Toolkit.GameTime gameTime)

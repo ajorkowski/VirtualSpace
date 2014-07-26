@@ -2,6 +2,9 @@
 using SharpDX.Direct3D;
 using SharpDX.Direct3D11;
 using SharpDX.MediaFoundation;
+using SharpDX.Multimedia;
+using SharpDX.X3DAudio;
+using SharpDX.XAudio2;
 using System;
 using System.Runtime.InteropServices;
 using System.Security;
@@ -24,10 +27,46 @@ namespace VirtualSpace.Platform.Windows.Video
             }
         }
 
+        private XAudio2 _audioEngine;
+        private MasteringVoice _masteringVoice;
+        private X3DAudio _x3DAudio;
+
         private MediaAndDeviceManager()
         {
             MediaManager.Startup();
             DecoderRegister.Register();
+        }
+
+        public XAudio2 AudioEngine 
+        { 
+            get 
+            {
+                InitialiseAudio();
+                return _audioEngine; 
+            } 
+        }
+
+        public Voice MasterVoice
+        {
+            get
+            {
+                InitialiseAudio();
+                return _masteringVoice;
+            }
+        }
+
+        public X3DAudio X3DAudioEngine
+        {
+            get
+            {
+                if(_x3DAudio == null)
+                {
+                    InitialiseAudio();
+                    _x3DAudio = new X3DAudio((Speakers)_masteringVoice.ChannelMask);
+                }
+
+                return _x3DAudio;
+            }
         }
 
         public VideoDevice CreateVideoDevice()
@@ -50,8 +89,20 @@ namespace VirtualSpace.Platform.Windows.Video
 
         public void Dispose()
         {
+            Utilities.Dispose(ref _masteringVoice);
+            Utilities.Dispose(ref _audioEngine);
             MediaManager.Shutdown();
             GC.SuppressFinalize(this);
+        }
+
+        private void InitialiseAudio()
+        {
+            if (_audioEngine == null)
+            {
+                _audioEngine = new XAudio2();
+                _audioEngine.StartEngine();
+                _masteringVoice = new MasteringVoice(_audioEngine, 0, 0);
+            }
         }
 
         private VideoDevice TryCreateDx9Manager()

@@ -32,6 +32,7 @@ namespace VirtualSpace.Platform.Windows.Video
         private bool _canSeek;
         private TimeSpan _duration;
         private bool _isBuffering;
+        private bool _isAudioBuffering;
 
         public bool CanSeek { get { return _canSeek; } }
         public TimeSpan Duration { get { return _duration; } }
@@ -42,6 +43,7 @@ namespace VirtualSpace.Platform.Windows.Video
             _toDispose = new List<IDisposable>();
             _streamMetadata = new List<Core.Video.StreamMetadata>();
             _isBuffering = true;
+            _isAudioBuffering = true;
 
             // Creates an URL to the file
             var url = new Uri(file, UriKind.RelativeOrAbsolute);
@@ -143,9 +145,13 @@ namespace VirtualSpace.Platform.Windows.Video
             _state = VideoState.Paused;
         }
 
-        public SharpDX.Direct3D11.Texture2D GetOutputRenderTexture(SharpDX.Direct3D11.Device device)
+        public ScreenOutput GetOutput(SharpDX.Direct3D11.Device device)
         {
-            var renderTexture = _videoStream.GetOutputRenderTexture(device);
+            var output = new ScreenOutput
+            {
+                 Texture = _videoStream.GetOutputRenderTexture(device),
+                 Audio = _audioStream.GetOutputSourceVoice()
+            };
             
             // Make sure we let the decoder know we have frames to use!
             if (_waitForUnusedFrame != null)
@@ -153,7 +159,7 @@ namespace VirtualSpace.Platform.Windows.Video
                 _waitForUnusedFrame.Set();
             }
 
-            return renderTexture;
+            return output;
         }
 
         public void Update(GameTime time)
@@ -162,6 +168,7 @@ namespace VirtualSpace.Platform.Windows.Video
 
             _currentTime = _currentTime.Add(time.ElapsedGameTime);
             _videoStream.UpdateFrame(_waitForUnusedFrame, ref _currentTime, ref _state);
+            _audioStream.UpdateFrame(_waitForUnusedFrame, ref _state);
 
             if (!_videoStream.HasFrames && !_isBuffering)
             {
@@ -204,9 +211,11 @@ namespace VirtualSpace.Platform.Windows.Video
         {
             _currentTime = TimeSpan.FromMilliseconds(0);
             _isBuffering = true;
+            _isAudioBuffering = true;
             while (_state != VideoState.Finished)
             {
-                if (!_isBuffering || !_videoStream.TryEnqueue(ref _isBuffering))
+                if ((!_isBuffering || !_videoStream.TryEnqueue(ref _isBuffering))
+                    && (!_isAudioBuffering || !_audioStream.TryEnqueue(ref _isAudioBuffering)))
                 {
                     _waitForUnusedFrame.Reset();
                     _waitForUnusedFrame.WaitOne();

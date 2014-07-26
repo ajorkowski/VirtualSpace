@@ -61,6 +61,9 @@
     <Reference Include="SharpDX.Toolkit.Input">
       <HintPath>$(SharpDXPackageBinDir)\SharpDX.Toolkit.Input.dll</HintPath>
     </Reference>
+    <Reference Include="SharpDX.XAudio2">
+      <HintPath>$(SharpDXPackageBinDir)\SharpDX.XAudio2.dll</HintPath>
+    </Reference>
     <Reference Include="System" />
     <Reference Include="Microsoft.CSharp" />
     <Reference Include="System.Drawing" />
@@ -78,11 +81,14 @@
     <Compile Include="Rendering\SceneRenderer.cs" />
     <Compile Include="Rendering\Screen\IScreenSource.cs" />
     <Compile Include="Rendering\Screen\ScreenManager.cs" />
+    <Compile Include="Rendering\Screen\ScreenOutput.cs" />
     <Compile Include="Rendering\Screen\ScreenRenderer.cs" />
     <Compile Include="Desktop\DesktopDX11.cs" />
     <Compile Include="Desktop\DesktopGdi.cs" />
+    <Compile Include="Video\AudioDelayEffect.cs" />
     <Compile Include="Video\AudioStream.cs" />
     <Compile Include="Video\MediaAndDeviceManager.cs" />
+    <Compile Include="Video\SpeakerConfiguration.cs" />
     <Compile Include="Video\VideoDevice.cs" />
     <Compile Include="Video\VideoSource.cs" />
     <Compile Include="Rendering\WindowOutputRenderer.cs" />

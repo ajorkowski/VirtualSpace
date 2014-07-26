@@ -274,11 +274,7 @@ namespace VirtualSpace.Platform.Windows.Video
         public void Dispose()
         {
             VideoFrame f;
-            while (_bufferedFrames.TryDequeue(out f))
-            {
-                f.Texture.Dispose();
-            }
-            while (_unusedFrames.TryTake(out f))
+            while (_bufferedFrames.TryDequeue(out f) || _unusedFrames.TryTake(out f))
             {
                 f.Texture.Dispose();
             }

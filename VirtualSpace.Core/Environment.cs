@@ -21,11 +21,13 @@ namespace VirtualSpace.Core
 
         private List<string> _videos;
         private int _currentVideo;
+        private bool _enableStereoDelay;
 
         public Environment(IScreenSourceFactory screenFactory, IFolder folder)
         {
             VSync = true;
             _screenFactory = screenFactory;
+            _enableStereoDelay = true;
 
             _videos = new List<string>();
             _currentVideo = 0;
@@ -77,6 +79,7 @@ namespace VirtualSpace.Core
                 _videoSource = _screenFactory.OpenVideo(_videos[_currentVideo]);
                 //_currentSource = _screenFactory.OpenPrimaryDesktop();
                 _currentScreen = _renderer.ScreenManager.CreateScreen(_videoSource, 17.2f, 17.2f);
+                _currentScreen.StereoDelayEnabled = _enableStereoDelay;
 
                 _currentVideo++;
             }
@@ -97,6 +100,12 @@ namespace VirtualSpace.Core
             if (_input.IsPressed(Keys.B))
             {
                 ShowFPS = !ShowFPS;
+            }
+
+            if(_input.IsPressed(Keys.N) && _currentScreen != null)
+            {
+                _enableStereoDelay = !_enableStereoDelay;
+                _currentScreen.StereoDelayEnabled = _enableStereoDelay;
             }
 #endif
         }

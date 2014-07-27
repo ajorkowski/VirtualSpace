@@ -13,5 +13,8 @@ namespace VirtualSpace.Core.Renderer.Screen
         /// Radius to center of curvature, 0 to keep it flat
         /// </summary>
         float CurveRadius { get; set; }
+
+        bool HasStereoDelay { get; }
+        bool StereoDelayEnabled { get; set; }
     }
 }

@@ -4,7 +4,6 @@ using SharpDX.Multimedia;
 using SharpDX.Toolkit;
 using SharpDX.Toolkit.Graphics;
 using SharpDX.X3DAudio;
-using SharpDX.XAPO.Fx;
 using SharpDX.XAudio2;
 using System;
 using System.Collections.Generic;
@@ -32,6 +31,7 @@ namespace VirtualSpace.Platform.Windows.Rendering.Screen
         private Listener _audioListener;
         private DspSettings _dspSettings;
         private bool _stereoVirtualisation;
+        private bool _enableStereoDelay;
         private float[] _lowFreqOutput;
 
         public ScreenRenderer(Game game, ICameraProvider camera, IScreenSource source, float screenSize, float curveRadius)
@@ -40,6 +40,7 @@ namespace VirtualSpace.Platform.Windows.Rendering.Screen
             _source = source;
             _cameraService = camera;
             _speakerOutputs = new Dictionary<Speakers, SpeakerOutput>();
+            _enableStereoDelay = true;
             Visible = true;
             Enabled = true;
             ScreenSize = screenSize;
@@ -285,10 +286,34 @@ namespace VirtualSpace.Platform.Windows.Rendering.Screen
 
         public float ScreenSize { get; set; }
         public float CurveRadius { get; set; }
+        public bool HasStereoDelay { get { return _stereoVirtualisation; } }
+        public bool StereoDelayEnabled
+        {
+            get { return _enableStereoDelay; }
+            set
+            {
+                _enableStereoDelay = value;
+                foreach (var o in _speakerOutputs.Where(s => s.Value.LeftOut != null))
+                {
+                    if (value)
+                    {
+                        o.Value.LeftOut.EnableEffect(0);
+                        o.Value.RightOut.EnableEffect(0);
+                    }
+                    else
+                    {
+                        o.Value.LeftOut.DisableEffect(0);
+                        o.Value.RightOut.DisableEffect(0);
+                    }
+                }
+            }
+        }
 
         private SpeakerOutput CreateSpeakerOutput(int sampleRate, float minDistance)
         {
-            var voice = ToDisposeContent(new SubmixVoice(MediaAndDeviceManager.Current.AudioEngine, 1, sampleRate));
+            var voice = new SubmixVoice(MediaAndDeviceManager.Current.AudioEngine, 1, sampleRate);
+            ToDisposeContent(new Disposable(() => { voice.DestroyVoice(); voice.Dispose(); }));
+
             voice.SetVolume((float)(1.0 / Math.Pow(2, minDistance)));
 
             return new SpeakerOutput
@@ -308,13 +333,13 @@ namespace VirtualSpace.Platform.Windows.Rendering.Screen
 
         private void SetupStereoVirtualisation(int sampleRate)
         {
-            foreach(var o in _speakerOutputs)
+            foreach(var o in _speakerOutputs.Where(s => s.Key != Speakers.LowFrequency))
             {
                 var leftVoice = new SubmixVoice(MediaAndDeviceManager.Current.AudioEngine, 2, sampleRate, SubmixVoiceFlags.None, 10);
-                ToDisposeContent(new Disposable(() => { leftVoice.DisableEffect(0); leftVoice.DestroyVoice(); leftVoice.Dispose(); }));
+                ToDisposeContent(new Disposable(() => { leftVoice.DestroyVoice(); leftVoice.Dispose(); }));
 
                 var rightVoice = new SubmixVoice(MediaAndDeviceManager.Current.AudioEngine, 2, sampleRate, SubmixVoiceFlags.None, 10);
-                ToDisposeContent(new Disposable(() => { leftVoice.DisableEffect(0); rightVoice.DestroyVoice(); rightVoice.Dispose(); }));
+                ToDisposeContent(new Disposable(() => { rightVoice.DestroyVoice(); rightVoice.Dispose(); }));
 
                 o.Value.LeftOut = leftVoice;
                 o.Value.RightOut = rightVoice;
@@ -328,6 +353,12 @@ namespace VirtualSpace.Platform.Windows.Rendering.Screen
                 o.Value.LeftOut.SetEffectParameters<AudioDelayParam>(0, o.Value.Delay[0]);
                 o.Value.RightOut.SetEffectChain(new EffectDescriptor(new AudioDelayEffect(1000)));
                 o.Value.RightOut.SetEffectParameters<AudioDelayParam>(0, o.Value.Delay[1]);
+
+                if (!_enableStereoDelay)
+                {
+                    o.Value.LeftOut.DisableEffect(0);
+                    o.Value.RightOut.DisableEffect(0);
+                }
             }
         }
 

@@ -6,6 +6,7 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Threading;
+using VirtualSpace.Core;
 using VirtualSpace.Core.Video;
 
 namespace VirtualSpace.Platform.Windows.Video
@@ -80,7 +81,8 @@ namespace VirtualSpace.Platform.Windows.Video
 
         public SourceVoice GetOutputSourceVoice()
         {
-            _sourceVoice = AddDisposable(new SourceVoice(MediaAndDeviceManager.Current.AudioEngine, _waveFormat));
+            _sourceVoice = new SourceVoice(MediaAndDeviceManager.Current.AudioEngine, _waveFormat);
+            AddDisposable(new Disposable(() => { _sourceVoice.FlushSourceBuffers(); _sourceVoice.DestroyVoice(); _sourceVoice.Dispose(); }));
 
             for (int i = 0; i < MaxNumberOfFramesToQueue; i++)
             {
@@ -216,12 +218,6 @@ namespace VirtualSpace.Platform.Windows.Video
 
         public void Dispose()
         {
-            if(_sourceVoice != null)
-            {
-                _sourceVoice.FlushSourceBuffers();
-                _sourceVoice.DestroyVoice();
-            }
-
             AudioFrame f;
             while (_bufferedFrames.TryDequeue(out f) || _unusedFrames.TryTake(out f) || _playingFrames.TryDequeue(out f))
             {

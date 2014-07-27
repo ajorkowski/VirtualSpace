@@ -349,15 +349,15 @@ namespace VirtualSpace.Platform.Windows.Rendering.Screen
                 o.Value.RightDSP = new float[2] { 0f, 1f };
                 o.Value.Delay = new AudioDelayParam[2] { new AudioDelayParam { Delay = 0 }, new AudioDelayParam { Delay = 0 } };
 
-                o.Value.LeftOut.SetEffectChain(new EffectDescriptor(new AudioDelayEffect(1000)));
-                o.Value.LeftOut.SetEffectParameters<AudioDelayParam>(0, o.Value.Delay[0]);
-                o.Value.RightOut.SetEffectChain(new EffectDescriptor(new AudioDelayEffect(1000)));
-                o.Value.RightOut.SetEffectParameters<AudioDelayParam>(0, o.Value.Delay[1]);
+                leftVoice.SetEffectChain(new EffectDescriptor(new AudioDelayEffect(1000)));
+                leftVoice.SetEffectParameters<AudioDelayParam>(0, o.Value.Delay[0]);
+                rightVoice.SetEffectChain(new EffectDescriptor(new AudioDelayEffect(1000)));
+                rightVoice.SetEffectParameters<AudioDelayParam>(0, o.Value.Delay[1]);
 
                 if (!_enableStereoDelay)
                 {
-                    o.Value.LeftOut.DisableEffect(0);
-                    o.Value.RightOut.DisableEffect(0);
+                    leftVoice.DisableEffect(0);
+                    rightVoice.DisableEffect(0);
                 }
             }
         }

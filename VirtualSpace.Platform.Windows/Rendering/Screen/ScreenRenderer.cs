@@ -220,20 +220,18 @@ namespace VirtualSpace.Platform.Windows.Rendering.Screen
                     if (_stereoVirtualisation)
                     {
                         // Calculate X3DAudio settings
-                        _x3DAudio.Calculate(_audioListener, o.Value.Emitter, CalculateFlags.Matrix | CalculateFlags.Delay, _dspSettings);
-
-                        o.Value.LeftDSP[0] = _dspSettings.MatrixCoefficients[0];
-                        o.Value.RightDSP[1] = _dspSettings.MatrixCoefficients[1];
-
-                        var baseDelay = _dspSettings.EmitterToListenerDistance / X3DAudio.SpeedOfSound * 1000;
-                        o.Value.Delay[0].Delay = baseDelay + _dspSettings.DelayTimes[0];
-                        o.Value.Delay[1].Delay = baseDelay + _dspSettings.DelayTimes[1];
+                        _x3DAudio.Calculate(_audioListener, o.Value.Emitter, _enableStereoDelay ? CalculateFlags.Matrix | CalculateFlags.Delay : CalculateFlags.Matrix, _dspSettings);
 
                         // Modify XAudio2 source voice settings
-                        o.Value.Voice.SetOutputMatrix(o.Value.LeftOut, 1, 2, o.Value.LeftDSP);
-                        o.Value.Voice.SetOutputMatrix(o.Value.RightOut, 1, 2, o.Value.RightDSP);
-                        o.Value.LeftOut.SetEffectParameters<AudioDelayParam>(0, o.Value.Delay[0]);
-                        o.Value.RightOut.SetEffectParameters<AudioDelayParam>(0, o.Value.Delay[1]);
+                        o.Value.Voice.SetOutputMatrix(1, 2, _dspSettings.MatrixCoefficients);
+
+                        if (_enableStereoDelay)
+                        {
+                            var baseDelay = _dspSettings.EmitterToListenerDistance / X3DAudio.SpeedOfSound * 1000;
+                            var leftDelay = baseDelay + _dspSettings.DelayTimes[0];
+                            var rightDelay = baseDelay + _dspSettings.DelayTimes[1];
+                            o.Value.Voice.SetEffectParameters<AudioDelayParam>(0, new AudioDelayParam { LeftDelay = leftDelay, RightDelay = rightDelay });
+                        }
                     }
                     else
                     {
@@ -293,19 +291,29 @@ namespace VirtualSpace.Platform.Windows.Rendering.Screen
             set
             {
                 _enableStereoDelay = value;
-                foreach (var o in _speakerOutputs.Where(s => s.Value.LeftOut != null))
+                foreach (var o in _speakerOutputs.Where(s => s.Key != Speakers.LowFrequency))
                 {
                     if (value)
                     {
-                        o.Value.LeftOut.EnableEffect(0);
-                        o.Value.RightOut.EnableEffect(0);
+                        o.Value.Voice.EnableEffect(0);
                     }
                     else
                     {
-                        o.Value.LeftOut.DisableEffect(0);
-                        o.Value.RightOut.DisableEffect(0);
+                        o.Value.Voice.DisableEffect(0);
                     }
                 }
+
+                //foreach (var o in _speakerOutputs.Where(s => s.Value.DelayVoice != null))
+                //{
+                //    if (value)
+                //    {
+                //        o.Value.DelayVoice.EnableEffect(0);
+                //    }
+                //    else
+                //    {
+                //        o.Value.DelayVoice.DisableEffect(0);
+                //    }
+                //}
             }
         }
 
@@ -335,29 +343,26 @@ namespace VirtualSpace.Platform.Windows.Rendering.Screen
         {
             foreach(var o in _speakerOutputs.Where(s => s.Key != Speakers.LowFrequency))
             {
-                var leftVoice = new SubmixVoice(MediaAndDeviceManager.Current.AudioEngine, 2, sampleRate, SubmixVoiceFlags.None, 10);
-                ToDisposeContent(new Disposable(() => { leftVoice.DestroyVoice(); leftVoice.Dispose(); }));
+                //var delayVoice = new SubmixVoice(MediaAndDeviceManager.Current.AudioEngine, 2, sampleRate, SubmixVoiceFlags.None, 10);
+                //ToDisposeContent(new Disposable(() => { delayVoice.DestroyVoice(); delayVoice.Dispose(); }));
 
-                var rightVoice = new SubmixVoice(MediaAndDeviceManager.Current.AudioEngine, 2, sampleRate, SubmixVoiceFlags.None, 10);
-                ToDisposeContent(new Disposable(() => { rightVoice.DestroyVoice(); rightVoice.Dispose(); }));
+                //delayVoice.SetEffectChain(new EffectDescriptor(new AudioDelayEffect(1000)));
+                //delayVoice.SetEffectParameters<AudioDelayParam>(0, new AudioDelayParam { LeftDelay = 0, RightDelay = 0 });
 
-                o.Value.LeftOut = leftVoice;
-                o.Value.RightOut = rightVoice;
-                o.Value.Voice.SetOutputVoices(new VoiceSendDescriptor(o.Value.LeftOut), new VoiceSendDescriptor(o.Value.RightOut));
+                //if (!_enableStereoDelay)
+                //{
+                //    delayVoice.DisableEffect(0);
+                //}
 
-                o.Value.LeftDSP = new float[2] { 1f, 0f };
-                o.Value.RightDSP = new float[2] { 0f, 1f };
-                o.Value.Delay = new AudioDelayParam[2] { new AudioDelayParam { Delay = 0 }, new AudioDelayParam { Delay = 0 } };
+                //o.Value.DelayVoice = delayVoice;
+                //o.Value.Voice.SetOutputVoices(new VoiceSendDescriptor(delayVoice));
 
-                leftVoice.SetEffectChain(new EffectDescriptor(new AudioDelayEffect(1000)));
-                leftVoice.SetEffectParameters<AudioDelayParam>(0, o.Value.Delay[0]);
-                rightVoice.SetEffectChain(new EffectDescriptor(new AudioDelayEffect(1000)));
-                rightVoice.SetEffectParameters<AudioDelayParam>(0, o.Value.Delay[1]);
+                o.Value.Voice.SetEffectChain(new EffectDescriptor(new AudioDelayEffect(1000)));
+                o.Value.Voice.SetEffectParameters<AudioDelayParam>(0, new AudioDelayParam { LeftDelay = 0, RightDelay = 0 });
 
                 if (!_enableStereoDelay)
                 {
-                    leftVoice.DisableEffect(0);
-                    rightVoice.DisableEffect(0);
+                    o.Value.Voice.DisableEffect(0);
                 }
             }
         }
@@ -429,11 +434,7 @@ namespace VirtualSpace.Platform.Windows.Rendering.Screen
             public Emitter Emitter { get; set; }
 
             // For 2 channel delay virtualisation...
-            public SubmixVoice LeftOut { get; set; }
-            public SubmixVoice RightOut { get; set; }
-            public float[] LeftDSP { get; set; }
-            public float[] RightDSP { get; set; }
-            public AudioDelayParam[] Delay { get; set; }
+            //public SubmixVoice DelayVoice { get; set; }
         }
     }
 }

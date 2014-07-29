@@ -19,7 +19,6 @@ namespace VirtualSpace.Platform.Windows.Rendering
         private CameraProvider _cameraProvider;
         private ScreenManager _screenManager;
         private FpsRenderer _fpsRenderer;
-        private SceneRenderer _sceneRenderer;
         private IEnvironment _environment;
 
         private bool _currentVSync;
@@ -56,7 +55,6 @@ namespace VirtualSpace.Platform.Windows.Rendering
             _cameraProvider = ToDispose(new CameraProvider(this));
             _screenManager = ToDispose(new ScreenManager(this, _cameraProvider));
             _fpsRenderer = ToDispose(new FpsRenderer(this));
-            _sceneRenderer = ToDispose(new SceneRenderer(this, _cameraProvider));
 
             base.Initialize();
 

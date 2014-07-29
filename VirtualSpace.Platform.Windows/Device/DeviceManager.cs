@@ -18,7 +18,8 @@ namespace VirtualSpace.Platform.Windows.Device
 
         public DeviceManager()
         {
-            _window = new WindowOutputDevice(this);
+            //_window = new WindowOutputDevice(this);
+            _window = new OcculusOutputDevice(this);
         }
 
         public IEnumerable<D.IOutputDevice> GetDevices()

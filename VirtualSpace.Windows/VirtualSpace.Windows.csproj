@@ -13,7 +13,6 @@
     <FileAlignment>512</FileAlignment>
     <NuGetPackageImportStamp>73094697</NuGetPackageImportStamp>
     <SharpDXDirectXVersion>DirectX11_2</SharpDXDirectXVersion>
-    <SharpDXNoSigned>true</SharpDXNoSigned>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
     <PlatformTarget>AnyCPU</PlatformTarget>

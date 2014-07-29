@@ -44,29 +44,36 @@ namespace VirtualSpace.Platform.Windows.Video
 
             // Set correct video output format (for DX surface)
             var supportedTypes = new List<Guid>();
+            var deviceCount = 0;
             while (true)
             {
                 try
                 {
-                    using (var nativeFormat = _reader.GetNativeMediaType(sourceIndex, supportedTypes.Count))
+                    using (var nativeFormat = _reader.GetNativeMediaType(sourceIndex, deviceCount))
                     {
                         if (nativeFormat.Get(MediaTypeAttributeKeys.MajorType) != MediaTypeGuids.Video)
                         {
                             throw new InvalidOperationException("The stream is not a video type stream");
                         }
 
-                        supportedTypes.Add(nativeFormat.Get(MediaTypeAttributeKeys.Subtype));
+                        var nativeSubType = nativeFormat.Get(MediaTypeAttributeKeys.Subtype);
+                        if (nativeSubType == GetVideoFormat() || MediaAndDeviceManager.Current.HasDecoder(false, nativeSubType, GetVideoFormat()))
+                        {
+                            supportedTypes.Add(nativeSubType);
+                        }
                     }
                 }
                 catch (SharpDXException)
                 {
                     break;
                 }
+
+                deviceCount++;
             }
 
             if (supportedTypes.Count == 0)
             {
-                throw new InvalidOperationException("No output types for video supported...");
+                throw new NotSupportedException("No output types for video supported...");
             }
 
             using (var videoFormat = new MediaType())

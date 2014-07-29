@@ -140,7 +140,15 @@ namespace VirtualSpace.Platform.Windows.Video
 
             // Create the default video stream...
             _videoStream = AddDisposable(new VideoStream(_reader, _videoDevice, MF_SOURCE_READER_FIRST_VIDEO_STREAM));
-            _audioStream = AddDisposable(new AudioStream(_reader, MF_SOURCE_READER_FIRST_AUDIO_STREAM));
+
+            try
+            {
+                _audioStream = AddDisposable(new AudioStream(_reader, MF_SOURCE_READER_FIRST_AUDIO_STREAM));
+            }
+            catch (NotSupportedException e)
+            {
+                _reader.SetStreamSelection(MF_SOURCE_READER_FIRST_AUDIO_STREAM, false);
+            }
             
             _state = VideoState.Paused;
         }
@@ -150,7 +158,7 @@ namespace VirtualSpace.Platform.Windows.Video
             var output = new ScreenOutput
             {
                  Texture = _videoStream.GetOutputRenderTexture(device),
-                 Audio = _audioStream.GetOutputSourceVoice()
+                 Audio = _audioStream == null ? null : _audioStream.GetOutputSourceVoice()
             };
             
             // Make sure we let the decoder know we have frames to use!
@@ -168,7 +176,11 @@ namespace VirtualSpace.Platform.Windows.Video
 
             _currentTime = _currentTime.Add(time.ElapsedGameTime);
             _videoStream.UpdateFrame(_waitForUnusedFrame, ref _currentTime, ref _state);
-            _audioStream.UpdateFrame(_waitForUnusedFrame, ref _state);
+
+            if (_audioStream != null)
+            {
+                _audioStream.UpdateFrame(_waitForUnusedFrame, ref _state);
+            }
 
             if (!_videoStream.HasFrames && !_isBuffering)
             {
@@ -215,7 +227,7 @@ namespace VirtualSpace.Platform.Windows.Video
             while (_state != VideoState.Finished)
             {
                 if ((!_isBuffering || !_videoStream.TryEnqueue(ref _isBuffering))
-                    && (!_isAudioBuffering || !_audioStream.TryEnqueue(ref _isAudioBuffering)))
+                    && (_audioStream == null || !_isAudioBuffering || !_audioStream.TryEnqueue(ref _isAudioBuffering)))
                 {
                     _waitForUnusedFrame.Reset();
                     _waitForUnusedFrame.WaitOne();

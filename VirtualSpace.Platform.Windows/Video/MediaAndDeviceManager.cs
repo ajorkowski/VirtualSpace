@@ -87,6 +87,19 @@ namespace VirtualSpace.Platform.Windows.Video
             return new VideoDevice(VideoMode.Software, null, new SharpDX.Direct3D11.Device(DriverType.Hardware, DeviceCreationFlags.BgraSupport), null);
         }
 
+        public bool HasDecoder(bool isAudio, Guid inputMediaSubType, Guid outputMediaSubType)
+        {
+            var majorType = isAudio ? MediaTypeGuids.Audio : MediaTypeGuids.Video;
+
+            var activates = MediaFactory.FindTransform(
+                isAudio ? TransformCategoryGuids.AudioDecoder : TransformCategoryGuids.VideoDecoder,
+                TransformEnumFlag.Syncmft | TransformEnumFlag.Localmft | TransformEnumFlag.SortAndFilter,
+                new TRegisterTypeInformation { GuidMajorType = majorType, GuidSubtype = inputMediaSubType },
+                new TRegisterTypeInformation { GuidMajorType = majorType, GuidSubtype = outputMediaSubType });
+
+            return activates.Length > 0;
+        }
+
         public void Dispose()
         {
             Utilities.Dispose(ref _masteringVoice);
@@ -138,22 +151,6 @@ namespace VirtualSpace.Platform.Windows.Video
                     dxManager.ResetDevice(d9Device.NativePointer, resetToken);
 
                     manager = new ComObject(dxManager);
-
-                    // Try to create a query and execute it... seems to be a good test for a bad device...
-                    using (var query = new SharpDX.Direct3D9.Query(d9Device, SharpDX.Direct3D9.QueryType.Event))
-                    {
-                        query.Issue(SharpDX.Direct3D9.Issue.End);
-                        int iter = 10;
-                        bool temp;
-                        while (!query.GetData(out temp, true) || !temp)
-                        {
-                            if (iter < 0)
-                            {
-                                throw new InvalidOperationException("Could not query d9device");
-                            }
-                            iter--;
-                        }
-                    }
                 }
 
                 // Use default dx11 devices that will be able to chat to dx9?

@@ -40,29 +40,36 @@ namespace VirtualSpace.Platform.Windows.Video
 
             // Find supported audio types
             var supportedTypes = new List<Guid>();
+            var deviceCount = 0;
             while (true)
             {
                 try
                 {
-                    using (var nativeFormat = _reader.GetNativeMediaType(sourceIndex, supportedTypes.Count))
+                    using (var nativeFormat = _reader.GetNativeMediaType(sourceIndex, deviceCount))
                     {
                         if (nativeFormat.Get(MediaTypeAttributeKeys.MajorType) != MediaTypeGuids.Audio)
                         {
                             throw new InvalidOperationException("The stream is not an audio type stream");
                         }
 
-                        supportedTypes.Add(nativeFormat.Get(MediaTypeAttributeKeys.Subtype));
+                        var nativeSubType = nativeFormat.Get(MediaTypeAttributeKeys.Subtype);
+                        if (nativeSubType == AudioFormatGuids.Float || MediaAndDeviceManager.Current.HasDecoder(true, nativeSubType, AudioFormatGuids.Float))
+                        {
+                            supportedTypes.Add(nativeSubType);
+                        }
                     }
                 }
                 catch (SharpDXException)
                 {
                     break;
                 }
+
+                deviceCount++;
             }
 
             if (supportedTypes.Count == 0)
             {
-                throw new InvalidOperationException("No output types for audio supported...");
+                throw new NotSupportedException("No output types for audio supported...");
             }
 
             using (var audioFormat = new MediaType())

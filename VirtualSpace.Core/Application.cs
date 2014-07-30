@@ -1,6 +1,6 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.Linq;
-using System.Threading.Tasks;
 using VirtualSpace.Core.Device;
 
 namespace VirtualSpace.Core
@@ -10,6 +10,8 @@ namespace VirtualSpace.Core
         private readonly IDeviceManager _deviceManager;
         private readonly IEnvironment _environment;
 
+        private IOutputDevice _currentOutput;
+
         public Application(IDeviceManager deviceManager, IEnvironment environment)
         {
             _deviceManager = deviceManager;
@@ -18,22 +20,42 @@ namespace VirtualSpace.Core
 
         public void Run()
         {
-            var menuItems = new List<MenuItem>
+            RefreshMenu();
+
+            RunDevice(_deviceManager.GetDevices().First(d => d.IsAvailable));
+            _deviceManager.Run(_environment);
+        }
+
+        private void RunDevice(IOutputDevice device)
+        {
+            if (_currentOutput != null)
             {
-                new MenuItem { Name = "5 sec run", Click = RunDevice },
+                _currentOutput.Stop();
+            }
+
+            _currentOutput = device;
+            _currentOutput.Run();
+
+            RefreshMenu();
+        }
+
+        private void RefreshMenu()
+        {
+            var deviceItems = _deviceManager.GetDevices().Select(d => new MenuItem
+            {
+                Name = d.Name,
+                IsDisabled = !d.IsAvailable,
+                IsSelected = _currentOutput != null && d.Name == _currentOutput.Name,
+                Click = d.IsAvailable && (_currentOutput == null || d.Name != _currentOutput.Name) ? () => RunDevice(d) : (Action)null
+            });
+
+            var menu = new List<MenuItem>
+            {
+                new MenuItem { Name = "Output Device", Children = deviceItems },
                 new MenuItem { Name = "Exit", Click = () => _deviceManager.Exit() }
             };
 
-            RunDevice();
-            _deviceManager.Run(menuItems, _environment);
-        }
-
-        private async void RunDevice()
-        {
-            var device = _deviceManager.GetDevices().First();
-            device.Run();
-            //await Task.Delay(5000);
-            //device.Stop();
+            _deviceManager.UpdateMenu(menu);
         }
     }
 }

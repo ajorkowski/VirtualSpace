@@ -1,4 +1,5 @@
-﻿using System;
+﻿using SharpOVR;
+using System;
 using System.Threading;
 using System.Threading.Tasks;
 using VirtualSpace.Core.Device;
@@ -6,7 +7,7 @@ using VirtualSpace.Platform.Windows.Rendering;
 
 namespace VirtualSpace.Platform.Windows.Device
 {
-    public class OcculusOutputDevice : IOutputDevice
+    public sealed class OcculusOutputDevice : IOutputDevice
     {
         private readonly DeviceManager _manager;
 
@@ -16,11 +17,26 @@ namespace VirtualSpace.Platform.Windows.Device
         public OcculusOutputDevice(DeviceManager manager)
         {
             _manager = manager;
+
+            // Initialize OVR Library
+            OVR.Initialize();
         }
 
         public string Name
         {
-            get { return "Occulus Window"; }
+            get { return "Occulus Rift"; }
+        }
+
+        public bool IsAvailable
+        {
+            get 
+            { 
+#if DEBUG
+                return true;
+#else
+                return OVR.HmdDetect() > 0;
+#endif
+            }
         }
 
         public void Run()
@@ -60,6 +76,7 @@ namespace VirtualSpace.Platform.Windows.Device
         public void Dispose()
         {
             Stop();
+            OVR.Shutdown();
         }
     }
 }

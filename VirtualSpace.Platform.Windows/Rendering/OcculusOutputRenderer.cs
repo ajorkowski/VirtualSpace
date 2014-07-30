@@ -53,10 +53,6 @@ namespace VirtualSpace.Platform.Windows.Rendering
 
             IsMouseVisible = true;
 
-            // Initialize OVR Library
-            OVR.Initialize();
-            ToDispose(new Disposable(() => OVR.Shutdown()));
-
             // Create our HMD
             var hmd = OVR.HmdCreate(0);
 

@@ -14,31 +14,17 @@ namespace VirtualSpace.Platform.Windows.Device
         private ContextMenu _trayMenu;
         private IEnvironment _environment;
 
-        private D.IOutputDevice _window;
+        private List<D.IOutputDevice> _outputDevices;
 
         public DeviceManager()
         {
-            //_window = new WindowOutputDevice(this);
-            _window = new OcculusOutputDevice(this);
-        }
-
-        public IEnumerable<D.IOutputDevice> GetDevices()
-        {
-            return new List<D.IOutputDevice> { _window };
-        }
-
-        public IEnvironment Environment { get { return _environment; } }
-
-        public void Run(IEnumerable<D.MenuItem> menuItems, IEnvironment environment)
-        {
-            _environment = environment;
+            _outputDevices = new List<D.IOutputDevice>
+            {
+                new OcculusOutputDevice(this),
+                new WindowOutputDevice(this)
+            };
 
             _trayMenu = new ContextMenu();
-            var items = CreateMenuItems(menuItems);
-            foreach (var i in items)
-            {
-                _trayMenu.MenuItems.Add(i);
-            }
 
             _trayIcon = new NotifyIcon();
             _trayIcon.Text = "Virtual Space";
@@ -47,7 +33,26 @@ namespace VirtualSpace.Platform.Windows.Device
             // Add menu to tray icon and show it.
             _trayIcon.ContextMenu = _trayMenu;
             _trayIcon.Visible = true;
+        }
 
+        public IEnumerable<D.IOutputDevice> GetDevices()
+        {
+            return _outputDevices;
+        }
+
+        public IEnvironment Environment { get { return _environment; } }
+
+        public void UpdateMenu(IEnumerable<D.MenuItem> menuItems)
+        {
+            _trayMenu.MenuItems.Clear();
+
+            var items = CreateMenuItems(menuItems);
+            _trayMenu.MenuItems.AddRange(items);
+        }
+
+        public void Run(IEnvironment environment)
+        {
+            _environment = environment;
             System.Windows.Forms.Application.Run();
         }
 
@@ -60,15 +65,23 @@ namespace VirtualSpace.Platform.Windows.Device
         {
             return menuItems.Select(m =>
             {
+                var menu = new MenuItem(m.Name)
+                {
+                    Enabled = !m.IsDisabled,
+                    Checked = m.IsSelected
+                };
+
                 if (m.Click != null)
                 {
-                    var local = m;
-                    return new MenuItem(m.Name, (o, s) => local.Click());
+                    menu.Click += (o, s) => m.Click();
                 }
-                else
+
+                if (m.Children != null && m.Children.Any())
                 {
-                    return new MenuItem(m.Name, CreateMenuItems(m.Children));
+                    menu.MenuItems.AddRange(CreateMenuItems(m.Children));
                 }
+
+                return menu;
             }).ToArray();
         }
 
@@ -84,7 +97,10 @@ namespace VirtualSpace.Platform.Windows.Device
                 _trayMenu.Dispose();
             }
 
-            _window.Dispose();
+            foreach (var o in _outputDevices)
+            {
+                o.Dispose();
+            }
         }
     }
 }

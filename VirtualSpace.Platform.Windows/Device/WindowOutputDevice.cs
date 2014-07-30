@@ -18,10 +18,8 @@ namespace VirtualSpace.Platform.Windows.Device
             _manager = manager;
         }
 
-        public string Name
-        {
-            get { return "Window"; }
-        }
+        public string Name { get { return "Window"; } }
+        public bool IsAvailable { get { return true; } }
 
         public void Run()
         {

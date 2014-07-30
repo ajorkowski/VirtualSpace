@@ -309,7 +309,7 @@ namespace VirtualSpace.Platform.Windows.Rendering.Screen
 
         private SpeakerOutput CreateSpeakerOutput(int sampleRate, float minDistance)
         {
-            var voice = new SubmixVoice(MediaAndDeviceManager.Current.AudioEngine, 1, sampleRate);
+            var voice = new SubmixVoice(MediaAndDeviceManager.Current.AudioEngine, 1, sampleRate, SubmixVoiceFlags.None, 10);
             ToDisposeContent(new Disposable(() => { voice.DestroyVoice(); voice.Dispose(); }));
 
             voice.SetVolume((float)(1.0 / Math.Pow(2, minDistance)));

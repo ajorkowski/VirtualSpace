@@ -8,8 +8,7 @@ namespace VirtualSpace.Platform.Windows.Video
     [StructLayout(LayoutKind.Sequential)]
     internal struct AudioDelayParam
     {
-        public float LeftDelay { get; set; }
-        public float RightDelay { get; set; }
+        public float[] Delays { get; set; }
     }
 
     internal class AudioDelayEffect : AudioProcessorBase<AudioDelayParam>
@@ -20,16 +19,18 @@ namespace VirtualSpace.Platform.Windows.Video
         private int _storedFrames;
 
         private float[] _delayedData;
-        private int _lastDelayAmountLeft;
-        private int _lastDelayAmountRight;
+        private int[] _lastDelayAmount;
+
+        // Working arrays
+        private int[] _delaySampleAmount;
+        private int[] _delayDiff;
+        private int[] _lastStartFrame;
 
         public AudioDelayEffect(float maxDelay)
         {
             _maxDelay = maxDelay;
             _lastFrame = 0;
             _storedFrames = 0;
-            _lastDelayAmountLeft = 0;
-            _lastDelayAmountRight = 0;
 
             RegistrationProperties = new RegistrationProperties()
             {
@@ -40,109 +41,103 @@ namespace VirtualSpace.Platform.Windows.Video
                 MaxOutputBufferCount = 1,
                 MinInputBufferCount = 1,
                 MinOutputBufferCount = 1,
-                Flags = PropertyFlags.Default
+                Flags = PropertyFlags.BitspersampleMustMatch | PropertyFlags.FrameRateMustMatch | PropertyFlags.InplaceSupported
             };
         }
 
         public override void Process(BufferParameters[] inputProcessParameters, BufferParameters[] outputProcessParameters, bool isEnabled)
         {
             int frameCount = inputProcessParameters[0].ValidFrameCount;
-            if (Parameters.LeftDelay > _maxDelay || Parameters.LeftDelay < 0)
-            {
-                throw new InvalidOperationException("Left Delay is out of range");
-            }
-            if (Parameters.RightDelay > _maxDelay || Parameters.RightDelay < 0)
-            {
-                throw new InvalidOperationException("Right Delay is out of range");
-            }
+            int outputFrameCount = outputProcessParameters[0].ValidFrameCount;
 
             if (_delayedData == null)
             {
-                _delayedData = new float[2 * (int)(InputFormatLocked.SampleRate * _maxDelay / 1000)];
+                if(InputFormatLocked.Channels != 1)
+                {
+                    throw new InvalidOperationException("Only supports one channel input");
+                }
+
+                _delayedData = new float[(int)(InputFormatLocked.SampleRate * _maxDelay / 1000)];
+                _lastDelayAmount = new int[OutputFormatLocked.Channels];
+                _delaySampleAmount = new int[OutputFormatLocked.Channels];
+                _delayDiff = new int[OutputFormatLocked.Channels];
+                _lastStartFrame = new int[OutputFormatLocked.Channels];
             }
 
-            var delaySampleAmountLeft = 2 * (int)(InputFormatLocked.SampleRate * Parameters.LeftDelay / 1000);
-            var delayDiffLeft = (_lastDelayAmountLeft - delaySampleAmountLeft) / 2;
+            for (var i = 0; i < OutputFormatLocked.Channels; i++)
+            {
+                if(Parameters.Delays[i] >= _maxDelay || Parameters.Delays[i] < 0)
+                {
+                    throw new InvalidOperationException("Delay is too large or negative, not allowed");
+                }
 
-            var delaySampleAmountRight = 2 * (int)(InputFormatLocked.SampleRate * Parameters.RightDelay / 1000);
-            var delayDiffRight = (_lastDelayAmountRight - delaySampleAmountRight) / 2;
+                _delaySampleAmount[i] = (int)(InputFormatLocked.SampleRate * Parameters.Delays[i] / 1000);
+                _delayDiff[i] = _lastDelayAmount[i] - _delaySampleAmount[i];
+                _lastStartFrame[i] = mod(_lastFrame - _lastDelayAmount[i], _delayedData.Length);
+            }
 
             using (var input = new DataStream(inputProcessParameters[0].Buffer, frameCount * InputFormatLocked.BlockAlign, true, false))
-            using (var output = new DataStream(inputProcessParameters[0].Buffer, frameCount * InputFormatLocked.BlockAlign, false, true))
+            using (var output = new DataStream(inputProcessParameters[0].Buffer, outputFrameCount * OutputFormatLocked.BlockAlign, false, true))
             {
-                var lastStartFrameLeft = mod(_lastFrame - _lastDelayAmountLeft, _delayedData.Length);
-                var lastStartFrameRight = mod(_lastFrame - _lastDelayAmountRight, _delayedData.Length);
-
                 for (int i = 0; i < frameCount; i++)
                 {
-                    var leftInput = _delayedData[_lastFrame] = input.Read<float>();
-                    var rightInput = _delayedData[_lastFrame + 1] = input.Read<float>();
+                    var inputFrame = _delayedData[_lastFrame] = input.Read<float>();
                     
-                    _lastFrame = mod(_lastFrame + 2, _delayedData.Length);
-                    if (_storedFrames < _delayedData.Length) { _storedFrames += 2; }
+                    _lastFrame = mod(_lastFrame + 1, _delayedData.Length);
+                    if (_storedFrames < _delayedData.Length) { _storedFrames++; }
 
-                    // If not enabled then just pass the data through
-                    // (We still store so that you can enable/disable easily)
-                    if (!isEnabled)
+                    for (var j = 0; j < OutputFormatLocked.Channels; j++)
                     {
-                        output.Write(leftInput);
-                        output.Write(rightInput);
-                        continue;
-                    }
+                        // If not enabled then just pass the data through
+                        // (We still store so that you can enable/disable easily)
+                        if (!isEnabled)
+                        {
+                            output.Write(inputFrame);
+                            continue;
+                        }
 
-                    OutputFrame(i, frameCount, output, 0, delaySampleAmountLeft, _lastDelayAmountLeft, delayDiffLeft, ref lastStartFrameLeft);
-                    OutputFrame(i, frameCount, output, 1, delaySampleAmountRight, _lastDelayAmountRight, delayDiffRight, ref lastStartFrameRight);
+                        if (_storedFrames < _delaySampleAmount[j])
+                        {
+                            output.Write(0f);
+                        }
+                        else
+                        {
+                            // work out the frame we need to get
+                            var startFrame = _lastFrame - _lastDelayAmount[j] + (i * _delayDiff[j] / frameCount);
+                            if (startFrame < 0)
+                            {
+                                startFrame += _delayedData.Length;
+                            }
+
+                            if (_lastStartFrame[j] == startFrame)
+                            {
+                                // Interpolate between current and next frame
+                                var nextFrame = (startFrame + 1) % _delayedData.Length;
+                                output.Write((_delayedData[startFrame] + _delayedData[nextFrame]) / 2);
+                            }
+                            else
+                            {
+                                var data = 0f;
+                                var count = 0f;
+                                var direction = _lastStartFrame[j] > startFrame ? -1 : 1;
+
+                                while (_lastStartFrame[j] != startFrame)
+                                {
+                                    _lastStartFrame[j] = mod(_lastStartFrame[j] + direction, _delayedData.Length);
+                                    data += _delayedData[_lastStartFrame[j]];
+                                    count++;
+                                }
+
+                                output.Write(count == 0 ? 0 : data / count);
+                            }
+                        }
+                    }
                 }
             }
 
-            _lastDelayAmountLeft = delaySampleAmountLeft;
-            _lastDelayAmountRight = delaySampleAmountRight;
-        }
-
-        private void OutputFrame(int i, int frameCount, DataStream output, int offset, int delayAmount, int lastDelayAmount, int delayDiff, ref int lastStartFrame)
-        {
-            if (_storedFrames < delayAmount)
+            for (var i = 0; i < OutputFormatLocked.Channels; i++)
             {
-                output.Write(0f);
-            }
-            else
-            {
-                // work out the frame we need to get
-                var startFrame = _lastFrame - lastDelayAmount + 2 * (i * delayDiff / frameCount);
-                if (startFrame < 0)
-                {
-                    startFrame += _delayedData.Length;
-                }
-
-                if (lastStartFrame == startFrame)
-                {
-                    // Interpolate between current and next frame
-                    var nextFrame = (startFrame + 2) % _delayedData.Length;
-                    output.Write((_delayedData[startFrame + offset] + _delayedData[nextFrame + offset]) / 2);
-                }
-                else
-                {
-                    var data = 0f;
-                    var count = 0f;
-                    var direction = lastStartFrame > startFrame ? -1 : 1;
-
-                    while (lastStartFrame != startFrame)
-                    {
-                        lastStartFrame += 2 * direction;
-                        if (lastStartFrame >= _delayedData.Length)
-                        {
-                            lastStartFrame -= _delayedData.Length;
-                        }
-                        else if (lastStartFrame < 0)
-                        {
-                            lastStartFrame += _delayedData.Length;
-                        }
-                        data += _delayedData[lastStartFrame + offset];
-                        count++;
-                    }
-
-                    output.Write(count == 0 ? 0 : data / count);
-                }
+                _lastDelayAmount[i] = _delaySampleAmount[i];
             }
         }
 

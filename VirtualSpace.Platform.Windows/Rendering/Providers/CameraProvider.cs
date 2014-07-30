@@ -4,7 +4,7 @@ using VirtualSpace.Core.Renderer;
 
 namespace VirtualSpace.Platform.Windows.Rendering.Providers
 {
-    internal sealed class CameraProvider : GameSystem, ICameraProvider, ICamera
+    internal class CameraProvider : GameSystem, ICameraProvider, ICamera
     {
         private Matrix _view;
         private Matrix _projection;
@@ -20,8 +20,8 @@ namespace VirtualSpace.Platform.Windows.Rendering.Providers
             game.GameSystems.Add(this);
         }
 
-        public Matrix View { get { return _view; } }
-        public Matrix Projection { get { return _projection; } }
+        public virtual Matrix View { get { return _view; } }
+        public virtual Matrix Projection { get { return _projection; } }
 
         public override void Initialize()
         {

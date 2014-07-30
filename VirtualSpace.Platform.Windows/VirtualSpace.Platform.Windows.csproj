@@ -12,7 +12,6 @@
     <TargetFrameworkVersion>v4.5</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
     <SharpDXDirectXVersion>DirectX11_2</SharpDXDirectXVersion>
-    
     <NuGetPackageImportStamp>d2a6800f</NuGetPackageImportStamp>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
@@ -82,6 +81,7 @@
     <Compile Include="Rendering\Providers\CameraProvider.cs" />
     <Compile Include="Rendering\Providers\ICameraProvider.cs" />
     <Compile Include="Rendering\Providers\KeyboardProvider.cs" />
+    <Compile Include="Rendering\Providers\OcculusCameraProvider.cs" />
     <Compile Include="Rendering\RenderingOrder.cs" />
     <Compile Include="Rendering\Screen\IScreenSource.cs" />
     <Compile Include="Rendering\Screen\ScreenManager.cs" />

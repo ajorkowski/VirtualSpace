@@ -56,10 +56,12 @@ namespace VirtualSpace.Platform.Windows.Video
                 {
                     attr.Set(SourceReaderAttributeKeys.D3DManager, _videoDevice.D3DManager);
                 }
+#if Win8
                 if (_videoDevice.VideoMode == VideoMode.Dx11)
                 {
                     attr.Set(SourceReaderAttributeKeys.EnableAdvancedVideoProcessing, true);
                 }
+#endif
                 if (_videoDevice.VideoMode == VideoMode.Software)
                 {
                     // This allows output format of rgb32 when software rendering
@@ -145,7 +147,7 @@ namespace VirtualSpace.Platform.Windows.Video
             {
                 _audioStream = AddDisposable(new AudioStream(_reader, MF_SOURCE_READER_FIRST_AUDIO_STREAM));
             }
-            catch (NotSupportedException e)
+            catch (NotSupportedException)
             {
                 _reader.SetStreamSelection(MF_SOURCE_READER_FIRST_AUDIO_STREAM, false);
             }

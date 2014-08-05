@@ -89,14 +89,6 @@ namespace VirtualSpace.Platform.Windows.Video
                 _stride = GetDefaultStride(currentFormat);
                 UnpackLong(currentFormat.Get(MediaTypeAttributeKeys.FrameSize), out _height, out _width);
             }
-
-            if (_videoDevice.VideoMode != VideoMode.Software)
-            {
-                using (var decoder = new Transform(_reader.GetServiceForStream(sourceIndex, Guid.Empty, typeof(Transform).GUID)))
-                {
-                    decoder.ProcessMessage(TMessageType.SetD3DManager, _videoDevice.D3DManager.NativePointer);
-                }
-            }
         }
 
         public bool HasFrames { get { return _bufferedFrames.Count > 0; } }
@@ -122,7 +114,7 @@ namespace VirtualSpace.Platform.Windows.Video
                 _d9Surface = AddDisposable(new SharpDX.Direct3D9.Texture(_videoDevice.D9Device, _width, _height, 1, SharpDX.Direct3D9.Usage.RenderTarget, SharpDX.Direct3D9.Format.A8R8G8B8, SharpDX.Direct3D9.Pool.Default, ref _d9SurfaceSharedHandle));
             }
 
-            using (var sharedResource = renderTexture.QueryInterface<SharpDX.DXGI.Resource1>())
+            using (var sharedResource = renderTexture.QueryInterface<SharpDX.DXGI.Resource>())
             {
                 //Get texture to be used by our media engine
                 _surface = AddDisposable(_videoDevice.Device.OpenSharedResource<Texture2D>(sharedResource.SharedHandle));
@@ -248,9 +240,11 @@ namespace VirtualSpace.Platform.Windows.Video
                         unused.Timestamp = TimeSpan.FromMilliseconds(timeStamp / 10000.0); // timestamps are in 100 nanoseconds
                         switch (_videoDevice.VideoMode)
                         {
+#if Win8
                             case VideoMode.Dx11:
                                 QueueSampleDx11(sample, unused.Texture);
                                 break;
+#endif
                             case VideoMode.Dx9:
                                 QueueSampleDx9(sample, unused.Texture);
                                 break;
@@ -295,6 +289,7 @@ namespace VirtualSpace.Platform.Windows.Video
             GC.SuppressFinalize(this);
         }
 
+#if Win8
         private void QueueSampleDx11(Sample sample, Texture2D bufferText)
         {
             using (var buffer = sample.GetBufferByIndex(0))
@@ -308,6 +303,7 @@ namespace VirtualSpace.Platform.Windows.Video
                 }
             }
         }
+#endif
 
         private void QueueSampleDx9(Sample sample, Texture2D bufferText)
         {

@@ -14,14 +14,14 @@ namespace VirtualSpace.Platform.Windows
 
         public IDesktop OpenPrimaryDesktop()
         {
+#if Win8
             if (Screen.DesktopDX11.IsSupported)
             {
                 return new Screen.DesktopDX11();
             }
-            else
-            {
-                return new Screen.DesktopGdi();
-            }
+#endif
+
+            return new Screen.DesktopGdi();
         }
     }
 }

@@ -4,26 +4,29 @@
   <PropertyGroup>
     <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
     <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
-    <ProjectGuid>{61FBD47F-BA3A-4902-9F0A-A8418A5F6225}</ProjectGuid>
-    <OutputType>Library</OutputType>
+    <ProjectGuid>{7F6DB00E-6132-438C-B242-4D54B549E4DB}</ProjectGuid>
+    <OutputType>WinExe</OutputType>
     <AppDesignerFolder>Properties</AppDesignerFolder>
-    <RootNamespace>VirtualSpace.Platform.Windows</RootNamespace>
-    <AssemblyName>VirtualSpace.Platform.Windows</AssemblyName>
+    <RootNamespace>VirtualSpace.Windows</RootNamespace>
+    <AssemblyName>VirtualSpace.Windows8</AssemblyName>
     <TargetFrameworkVersion>v4.5</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
+    <NuGetPackageImportStamp>73094697</NuGetPackageImportStamp>
     <SharpDXDirectXVersion>DirectX11_2</SharpDXDirectXVersion>
-    <NuGetPackageImportStamp>d2a6800f</NuGetPackageImportStamp>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
+    <PlatformTarget>AnyCPU</PlatformTarget>
     <DebugSymbols>true</DebugSymbols>
     <DebugType>full</DebugType>
     <Optimize>false</Optimize>
     <OutputPath>bin\Debug\</OutputPath>
-    <DefineConstants>DEBUG;TRACE</DefineConstants>
+    <DefineConstants>TRACE;DEBUG;Win8</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
+    <UseVSHostingProcess>true</UseVSHostingProcess>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
+    <PlatformTarget>AnyCPU</PlatformTarget>
     <DebugType>pdbonly</DebugType>
     <Optimize>true</Optimize>
     <OutputPath>bin\Release\</OutputPath>
@@ -32,21 +35,22 @@
     <WarningLevel>4</WarningLevel>
   </PropertyGroup>
   <ItemGroup>
+    <Reference Include="PCLStorage, Version=0.9.6.0, Culture=neutral, PublicKeyToken=286fe515a2c35b64, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>..\packages\PCLStorage.0.9.6\lib\net45\PCLStorage.dll</HintPath>
+    </Reference>
+    <Reference Include="PCLStorage.Abstractions, Version=0.9.6.0, Culture=neutral, PublicKeyToken=286fe515a2c35b64, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>..\packages\PCLStorage.0.9.6\lib\net45\PCLStorage.Abstractions.dll</HintPath>
+    </Reference>
     <Reference Include="SharpDX">
       <HintPath>$(SharpDXPackageBinDir)\SharpDX.dll</HintPath>
     </Reference>
     <Reference Include="SharpDX.Direct3D11">
       <HintPath>$(SharpDXPackageBinDir)\SharpDX.Direct3D11.dll</HintPath>
     </Reference>
-    <Reference Include="SharpDX.Direct3D9, Version=2.6.2.0, Culture=neutral, processorArchitecture=MSIL">
-      <SpecificVersion>False</SpecificVersion>
-      <HintPath>$(SharpDXPackageBinDir)\SharpDX.Direct3D9.dll</HintPath>
-    </Reference>
     <Reference Include="SharpDX.DXGI">
       <HintPath>$(SharpDXPackageBinDir)\SharpDX.DXGI.dll</HintPath>
-    </Reference>
-    <Reference Include="SharpDX.MediaFoundation">
-      <HintPath>$(SharpDXPackageBinDir)\SharpDX.MediaFoundation.dll</HintPath>
     </Reference>
     <Reference Include="SharpDX.Toolkit">
       <HintPath>$(SharpDXPackageBinDir)\SharpDX.Toolkit.dll</HintPath>
@@ -60,57 +64,59 @@
     <Reference Include="SharpDX.Toolkit.Input">
       <HintPath>$(SharpDXPackageBinDir)\SharpDX.Toolkit.Input.dll</HintPath>
     </Reference>
-    <Reference Include="SharpDX.XAudio2">
-      <HintPath>$(SharpDXPackageBinDir)\SharpDX.XAudio2.dll</HintPath>
-    </Reference>
-    <Reference Include="SharpOVR">
-      <HintPath>..\packages\SharpOVR.0.4.0.1\lib\SharpOVR.dll</HintPath>
-    </Reference>
     <Reference Include="System" />
     <Reference Include="Microsoft.CSharp" />
     <Reference Include="System.Drawing" />
     <Reference Include="System.Windows.Forms" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="Device\OcculusOutputDevice.cs" />
-    <Compile Include="Device\DeviceManager.cs" />
-    <Compile Include="Device\WindowOutputDevice.cs" />
+    <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
-    <Compile Include="Rendering\FpsRenderer.cs" />
-    <Compile Include="Rendering\OcculusOutputRenderer.cs" />
-    <Compile Include="Rendering\Providers\CameraProvider.cs" />
-    <Compile Include="Rendering\Providers\ICameraProvider.cs" />
-    <Compile Include="Rendering\Providers\KeyboardProvider.cs" />
-    <Compile Include="Rendering\Providers\OcculusCameraProvider.cs" />
-    <Compile Include="Rendering\RenderingOrder.cs" />
-    <Compile Include="Rendering\Screen\IScreenSource.cs" />
-    <Compile Include="Rendering\Screen\ScreenManager.cs" />
-    <Compile Include="Rendering\Screen\ScreenOutput.cs" />
-    <Compile Include="Rendering\Screen\ScreenRenderer.cs" />
-    <Compile Include="Desktop\DesktopDX11.cs" />
-    <Compile Include="Desktop\DesktopGdi.cs" />
-    <Compile Include="Video\AudioDelayEffect.cs" />
-    <Compile Include="Video\AudioStream.cs" />
-    <Compile Include="Video\MediaAndDeviceManager.cs" />
-    <Compile Include="Video\SpeakerConfiguration.cs" />
-    <Compile Include="Video\VideoDevice.cs" />
-    <Compile Include="Video\VideoSource.cs" />
-    <Compile Include="Rendering\WindowOutputRenderer.cs" />
-    <Compile Include="ScreenSourceFactory.cs" />
-    <Compile Include="Video\VideoStream.cs" />
+    <Compile Include="TinyIoC.cs" />
   </ItemGroup>
   <ItemGroup>
+    <None Include="App.config" />
+    <None Include="Content\Videos\small.mkv">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+    <None Include="Content\Videos\small.ogv">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+    <None Include="Content\Videos\small.webm">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
     <None Include="packages.config" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\VideoDecoders.MediaFoundation\VideoDecoders.MediaFoundation.csproj">
-      <Project>{553b3a6b-0114-4a40-a278-a507b51253e0}</Project>
-      <Name>VideoDecoders.MediaFoundation</Name>
-    </ProjectReference>
+    <ToolkitFont Include="Content\Arial16.xml" />
+  </ItemGroup>
+  <ItemGroup>
     <ProjectReference Include="..\VirtualSpace.Core\VirtualSpace.Core.csproj">
       <Project>{ffe24297-c6fe-43f5-a9cc-56807405364d}</Project>
       <Name>VirtualSpace.Core</Name>
     </ProjectReference>
+    <ProjectReference Include="..\VirtualSpace.Platform.Windows\VirtualSpace.Platform.Windows8.csproj">
+      <Project>{5b87be00-65a2-4c3d-a3a8-49c6c4556448}</Project>
+      <Name>VirtualSpace.Platform.Windows8</Name>
+    </ProjectReference>
+  </ItemGroup>
+  <ItemGroup />
+  <ItemGroup>
+    <None Include="Content\Videos\small.3gp">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+    <None Include="Content\Videos\small.m4v">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+    <None Include="Content\Videos\small.mov">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+    <None Include="Content\Videos\small.mp4">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+    <None Include="Content\Videos\small.wmv">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <Import Project="..\packages\SharpDX.2.6.2\build\SharpDX.targets" Condition="Exists('..\packages\SharpDX.2.6.2\build\SharpDX.targets')" />

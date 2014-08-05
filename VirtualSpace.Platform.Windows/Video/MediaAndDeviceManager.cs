@@ -6,9 +6,11 @@ using SharpDX.Multimedia;
 using SharpDX.X3DAudio;
 using SharpDX.XAudio2;
 using System;
-using System.Runtime.InteropServices;
-using System.Security;
 using VideoDecoders.MediaFoundation;
+
+#if Win7
+using SharpDX.MediaFoundation.DirectX;
+#endif
 
 namespace VirtualSpace.Platform.Windows.Video
 {
@@ -62,7 +64,14 @@ namespace VirtualSpace.Platform.Windows.Video
                 if(_x3DAudio == null)
                 {
                     InitialiseAudio();
-                    _x3DAudio = new X3DAudio((Speakers)_masteringVoice.ChannelMask);
+#if Win8
+                    var speakers = (Speakers)_masteringVoice.ChannelMask;
+#endif
+#if Win7
+                    var speakers = _audioEngine.GetDeviceDetails(0).OutputFormat.ChannelMask;
+#endif
+
+                    _x3DAudio = new X3DAudio(speakers);
                 }
 
                 return _x3DAudio;
@@ -71,17 +80,21 @@ namespace VirtualSpace.Platform.Windows.Video
 
         public VideoDevice CreateVideoDevice()
         {
+#if Win8
             var dx11Manager = TryCreateDx11Manager();
             if (dx11Manager != null)
             {
                 return dx11Manager;
             }
+#endif
 
+#if Win7
             var dx9Manager = TryCreateDx9Manager();
             if (dx9Manager != null)
             {
                 return dx9Manager;
             }
+#endif
 
             // Fallback software device
             return new VideoDevice(VideoMode.Software, null, new SharpDX.Direct3D11.Device(DriverType.Hardware, DeviceCreationFlags.BgraSupport), null);
@@ -118,9 +131,10 @@ namespace VirtualSpace.Platform.Windows.Video
             }
         }
 
+#if Win7
         private VideoDevice TryCreateDx9Manager()
         {
-            ComObject manager = null;
+            Direct3DDeviceManager manager = null;
             SharpDX.Direct3D9.DeviceEx d9Device = null;
             SharpDX.Direct3D11.Device device = null;
             try
@@ -144,13 +158,8 @@ namespace VirtualSpace.Platform.Windows.Video
                         PresentFlags = SharpDX.Direct3D9.PresentFlags.Video
                     });
 
-                    int resetToken;
-                    IDirect3DDeviceManager9 dxManager;
-                    DXVA2CreateDirect3DDeviceManager9(out resetToken, out dxManager);
-
-                    dxManager.ResetDevice(d9Device.NativePointer, resetToken);
-
-                    manager = new ComObject(dxManager);
+                    manager = new Direct3DDeviceManager();
+                    manager.ResetDevice(d9Device, manager.CreationToken);
                 }
 
                 // Use default dx11 devices that will be able to chat to dx9?
@@ -179,7 +188,9 @@ namespace VirtualSpace.Platform.Windows.Video
 
             return manager == null ? null : new VideoDevice(VideoMode.Dx9, manager, device, d9Device);
         }
+#endif
 
+#if Win8
         private VideoDevice TryCreateDx11Manager()
         {
             //Device need bgra and video support
@@ -216,25 +227,6 @@ namespace VirtualSpace.Platform.Windows.Video
 
             return dxgiManager == null ? null : new VideoDevice(VideoMode.Dx11, dxgiManager, device, null);
         }
-
-        /**********************************************************
-         * COM Imports only used here...
-         * ********************************************************/
-        [ComImport, System.Security.SuppressUnmanagedCodeSecurity,
-        Guid("a0cade0f-06d5-4cf4-a1c7-f3cdd725aa75"),
-        InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
-        private interface IDirect3DDeviceManager9
-        {
-            void ResetDevice([In] IntPtr pDevice, [In] int resetToken);
-
-            void Junk2();
-            void Junk3();
-            void Junk4();
-            void Junk5();
-            void Junk6();
-        }
-
-        [DllImport("dxva2.DLL", ExactSpelling = true, PreserveSig = false), SuppressUnmanagedCodeSecurity]
-        private extern static void DXVA2CreateDirect3DDeviceManager9(out int pResetToken, out IDirect3DDeviceManager9 ppDXVAManager);
+#endif
     }
 }

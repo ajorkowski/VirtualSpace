@@ -3,7 +3,7 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 2013
 VisualStudioVersion = 12.0.30501.0
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "VirtualSpace.Windows", "VirtualSpace.Windows\VirtualSpace.Windows.csproj", "{AAA229FA-B7AE-4DBB-8803-30A4AAF8827A}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "VirtualSpace.Windows7", "VirtualSpace.Windows\VirtualSpace.Windows7.csproj", "{AAA229FA-B7AE-4DBB-8803-30A4AAF8827A}"
 	ProjectSection(ProjectDependencies) = postProject
 		{61FBD47F-BA3A-4902-9F0A-A8418A5F6225} = {61FBD47F-BA3A-4902-9F0A-A8418A5F6225}
 		{FFE24297-C6FE-43F5-A9CC-56807405364D} = {FFE24297-C6FE-43F5-A9CC-56807405364D}
@@ -13,11 +13,15 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "VirtualSpace.Core", "Virtua
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Platforms", "Platforms", "{268CCABE-BB75-49EB-8F72-72E2955162CE}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "VirtualSpace.Platform.Windows", "VirtualSpace.Platform.Windows\VirtualSpace.Platform.Windows.csproj", "{61FBD47F-BA3A-4902-9F0A-A8418A5F6225}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "VirtualSpace.Platform.Windows7", "VirtualSpace.Platform.Windows\VirtualSpace.Platform.Windows7.csproj", "{61FBD47F-BA3A-4902-9F0A-A8418A5F6225}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Decoders", "Decoders", "{97976C02-875E-4FEF-A919-57C81695BDE7}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "VideoDecoders.MediaFoundation", "VideoDecoders.MediaFoundation\VideoDecoders.MediaFoundation.csproj", "{553B3A6B-0114-4A40-A278-A507B51253E0}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "VirtualSpace.Platform.Windows8", "VirtualSpace.Platform.Windows\VirtualSpace.Platform.Windows8.csproj", "{5B87BE00-65A2-4C3D-A3A8-49C6C4556448}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "VirtualSpace.Windows8", "VirtualSpace.Windows\VirtualSpace.Windows8.csproj", "{7F6DB00E-6132-438C-B242-4D54B549E4DB}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -53,6 +57,18 @@ Global
 		{553B3A6B-0114-4A40-A278-A507B51253E0}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{553B3A6B-0114-4A40-A278-A507B51253E0}.Release|Any CPU.Build.0 = Release|Any CPU
 		{553B3A6B-0114-4A40-A278-A507B51253E0}.Release|x86.ActiveCfg = Release|Any CPU
+		{5B87BE00-65A2-4C3D-A3A8-49C6C4556448}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{5B87BE00-65A2-4C3D-A3A8-49C6C4556448}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{5B87BE00-65A2-4C3D-A3A8-49C6C4556448}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{5B87BE00-65A2-4C3D-A3A8-49C6C4556448}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{5B87BE00-65A2-4C3D-A3A8-49C6C4556448}.Release|Any CPU.Build.0 = Release|Any CPU
+		{5B87BE00-65A2-4C3D-A3A8-49C6C4556448}.Release|x86.ActiveCfg = Release|Any CPU
+		{7F6DB00E-6132-438C-B242-4D54B549E4DB}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{7F6DB00E-6132-438C-B242-4D54B549E4DB}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{7F6DB00E-6132-438C-B242-4D54B549E4DB}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{7F6DB00E-6132-438C-B242-4D54B549E4DB}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{7F6DB00E-6132-438C-B242-4D54B549E4DB}.Release|Any CPU.Build.0 = Release|Any CPU
+		{7F6DB00E-6132-438C-B242-4D54B549E4DB}.Release|x86.ActiveCfg = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -60,5 +76,6 @@ Global
 	GlobalSection(NestedProjects) = preSolution
 		{61FBD47F-BA3A-4902-9F0A-A8418A5F6225} = {268CCABE-BB75-49EB-8F72-72E2955162CE}
 		{553B3A6B-0114-4A40-A278-A507B51253E0} = {97976C02-875E-4FEF-A919-57C81695BDE7}
+		{5B87BE00-65A2-4C3D-A3A8-49C6C4556448} = {268CCABE-BB75-49EB-8F72-72E2955162CE}
 	EndGlobalSection
 EndGlobal

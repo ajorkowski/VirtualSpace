@@ -225,13 +225,14 @@ namespace VirtualSpace.Platform.Windows.Rendering.Screen
                         // Modify XAudio2 source voice settings
                         o.Value.Voice.SetOutputMatrix(1, 2, _dspSettings.MatrixCoefficients);
 
-                        if (_enableStereoDelay)
-                        {
-                            var baseDelay = _dspSettings.EmitterToListenerDistance / X3DAudio.SpeedOfSound * 1000;
-                            var leftDelay = baseDelay + _dspSettings.DelayTimes[0];
-                            var rightDelay = baseDelay + _dspSettings.DelayTimes[1];
-                            o.Value.Voice.SetEffectParameters<AudioDelayParam>(0, new AudioDelayParam { LeftDelay = leftDelay, RightDelay = rightDelay });
-                        }
+                        // TODO: Reenable when 2.6.3 SharpDX comes out with fixes I added
+                        //if (_enableStereoDelay)
+                        //{
+                        //    var baseDelay = _dspSettings.EmitterToListenerDistance / X3DAudio.SpeedOfSound * 1000;
+                        //    var leftDelay = baseDelay + _dspSettings.DelayTimes[0];
+                        //    var rightDelay = baseDelay + _dspSettings.DelayTimes[1];
+                        //    o.Value.Voice.SetEffectParameters<AudioDelayParam>(0, new AudioDelayParam { LeftDelay = leftDelay, RightDelay = rightDelay });
+                        //}
                     }
                     else
                     {
@@ -291,27 +292,16 @@ namespace VirtualSpace.Platform.Windows.Rendering.Screen
             set
             {
                 _enableStereoDelay = value;
-                foreach (var o in _speakerOutputs.Where(s => s.Key != Speakers.LowFrequency))
-                {
-                    if (value)
-                    {
-                        o.Value.Voice.EnableEffect(0);
-                    }
-                    else
-                    {
-                        o.Value.Voice.DisableEffect(0);
-                    }
-                }
-
-                //foreach (var o in _speakerOutputs.Where(s => s.Value.DelayVoice != null))
+                // TODO: Reenable when 2.6.3 SharpDX comes out with fixes I added
+                //foreach (var o in _speakerOutputs.Where(s => s.Key != Speakers.LowFrequency))
                 //{
                 //    if (value)
                 //    {
-                //        o.Value.DelayVoice.EnableEffect(0);
+                //        o.Value.Voice.EnableEffect(0);
                 //    }
                 //    else
                 //    {
-                //        o.Value.DelayVoice.DisableEffect(0);
+                //        o.Value.Voice.DisableEffect(0);
                 //    }
                 //}
             }
@@ -341,30 +331,17 @@ namespace VirtualSpace.Platform.Windows.Rendering.Screen
 
         private void SetupStereoVirtualisation(int sampleRate)
         {
-            foreach(var o in _speakerOutputs.Where(s => s.Key != Speakers.LowFrequency))
-            {
-                //var delayVoice = new SubmixVoice(MediaAndDeviceManager.Current.AudioEngine, 2, sampleRate, SubmixVoiceFlags.None, 10);
-                //ToDisposeContent(new Disposable(() => { delayVoice.DestroyVoice(); delayVoice.Dispose(); }));
+            // TODO: Reenable when 2.6.3 SharpDX comes out with fixes I added
+            //foreach(var o in _speakerOutputs.Where(s => s.Key != Speakers.LowFrequency))
+            //{
+            //    o.Value.Voice.SetEffectChain(new EffectDescriptor(new AudioDelayEffect(1000)));
+            //    o.Value.Voice.SetEffectParameters<AudioDelayParam>(0, new AudioDelayParam { LeftDelay = 0, RightDelay = 0 });
 
-                //delayVoice.SetEffectChain(new EffectDescriptor(new AudioDelayEffect(1000)));
-                //delayVoice.SetEffectParameters<AudioDelayParam>(0, new AudioDelayParam { LeftDelay = 0, RightDelay = 0 });
-
-                //if (!_enableStereoDelay)
-                //{
-                //    delayVoice.DisableEffect(0);
-                //}
-
-                //o.Value.DelayVoice = delayVoice;
-                //o.Value.Voice.SetOutputVoices(new VoiceSendDescriptor(delayVoice));
-
-                o.Value.Voice.SetEffectChain(new EffectDescriptor(new AudioDelayEffect(1000)));
-                o.Value.Voice.SetEffectParameters<AudioDelayParam>(0, new AudioDelayParam { LeftDelay = 0, RightDelay = 0 });
-
-                if (!_enableStereoDelay)
-                {
-                    o.Value.Voice.DisableEffect(0);
-                }
-            }
+            //    if (!_enableStereoDelay)
+            //    {
+            //        o.Value.Voice.DisableEffect(0);
+            //    }
+            //}
         }
 
         private static GeometricPrimitive CreateCurvedSurface(GraphicsDevice device, float distance, float width, float height, int tessellation)
@@ -432,9 +409,6 @@ namespace VirtualSpace.Platform.Windows.Rendering.Screen
         {
             public SubmixVoice Voice { get; set; }
             public Emitter Emitter { get; set; }
-
-            // For 2 channel delay virtualisation...
-            //public SubmixVoice DelayVoice { get; set; }
         }
     }
 }

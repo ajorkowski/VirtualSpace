@@ -70,7 +70,7 @@ namespace VirtualSpace.Platform.Windows.Screen
             var renderTexture = AddDisposable(new SharpDX.Direct3D11.Texture2D(device, sharedDesc));
 
             _captureDevice = AddDisposable(new SharpDX.Direct3D11.Device(SharpDX.Direct3D.DriverType.Hardware));
-            using (var sharedResource = renderTexture.QueryInterface<SharpDX.DXGI.Resource1>())
+            using (var sharedResource = renderTexture.QueryInterface<SharpDX.DXGI.Resource>())
             {
                 _sharedTexture = AddDisposable(_captureDevice.OpenSharedResource<Texture2D>(sharedResource.SharedHandle));
             }

@@ -100,7 +100,9 @@
       <Name>VirtualSpace.Platform.Windows8</Name>
     </ProjectReference>
   </ItemGroup>
-  <ItemGroup />
+  <ItemGroup>
+    <Content Include="Content\Arial12.xml" />
+  </ItemGroup>
   <ItemGroup>
     <None Include="Content\Videos\small.3gp">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>

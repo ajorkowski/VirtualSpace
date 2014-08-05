@@ -13,6 +13,7 @@ namespace VirtualSpace.Platform.Windows.Rendering
 {
     public sealed class WindowOutputRenderer : Game, IRenderer
     {
+        private readonly IDebugger _debugger;
         private readonly GraphicsDeviceManager _device;
         private KeyboardProvider _keyboardProvider;
 
@@ -23,8 +24,10 @@ namespace VirtualSpace.Platform.Windows.Rendering
 
         private bool _currentVSync;
 
-        public WindowOutputRenderer()
+        public WindowOutputRenderer(IDebugger debugger)
         {
+            _debugger = debugger;
+
 #if DEBUG
             SharpDX.Configuration.EnableObjectTracking = true;
 #endif
@@ -54,7 +57,7 @@ namespace VirtualSpace.Platform.Windows.Rendering
             _keyboardProvider = ToDispose(new KeyboardProvider(this));
             _cameraProvider = ToDispose(new CameraProvider(this));
             _screenManager = ToDispose(new ScreenManager(this, _cameraProvider));
-            _fpsRenderer = ToDispose(new FpsRenderer(this));
+            _fpsRenderer = ToDispose(new FpsRenderer(this, _debugger));
 
             base.Initialize();
 

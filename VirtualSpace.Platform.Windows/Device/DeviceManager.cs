@@ -16,12 +16,12 @@ namespace VirtualSpace.Platform.Windows.Device
 
         private List<D.IOutputDevice> _outputDevices;
 
-        public DeviceManager()
+        public DeviceManager(IDebugger debugger)
         {
             _outputDevices = new List<D.IOutputDevice>
             {
-                new OcculusOutputDevice(this),
-                new WindowOutputDevice(this)
+                new OcculusOutputDevice(this, debugger),
+                new WindowOutputDevice(this, debugger)
             };
 
             _trayMenu = new ContextMenu();

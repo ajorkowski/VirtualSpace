@@ -17,6 +17,7 @@ namespace VirtualSpace.Platform.Windows.Rendering
 {
     public sealed class OcculusOutputRenderer : Game, IRenderer
     {
+        private readonly IDebugger _debugger;
         private readonly GraphicsDeviceManager _device;
         private KeyboardProvider _keyboardProvider;
 
@@ -38,8 +39,10 @@ namespace VirtualSpace.Platform.Windows.Rendering
         private EyeRenderDesc[] _eyeRenderDesc;
         private PoseF[] _renderPose = new PoseF[2];
 
-        public OcculusOutputRenderer()
+        public OcculusOutputRenderer(IDebugger debugger)
         {
+            _debugger = debugger;
+
 #if DEBUG
             SharpDX.Configuration.EnableObjectTracking = true;
 #endif
@@ -87,7 +90,7 @@ namespace VirtualSpace.Platform.Windows.Rendering
             _keyboardProvider = ToDispose(new KeyboardProvider(this));
             _cameraProvider = ToDispose(new OcculusCameraProvider(this));
             _screenManager = ToDispose(new ScreenManager(this, _cameraProvider));
-            _fpsRenderer = ToDispose(new FpsRenderer(this));
+            _fpsRenderer = ToDispose(new FpsRenderer(this, _debugger));
 
             // Attach HMD to window
             var control = (System.Windows.Forms.Control)Window.NativeWindow;

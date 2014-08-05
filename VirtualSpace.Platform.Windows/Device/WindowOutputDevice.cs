@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Threading;
 using System.Threading.Tasks;
+using VirtualSpace.Core;
 using VirtualSpace.Core.Device;
 using VirtualSpace.Platform.Windows.Rendering;
 
@@ -9,13 +10,15 @@ namespace VirtualSpace.Platform.Windows.Device
     public class WindowOutputDevice : IOutputDevice
     {
         private readonly DeviceManager _manager;
+        private readonly IDebugger _debugger;
 
         private CancellationTokenSource _source;
         private Task _rendererTask;
 
-        public WindowOutputDevice(DeviceManager manager)
+        public WindowOutputDevice(DeviceManager manager, IDebugger debugger)
         {
             _manager = manager;
+            _debugger = debugger;
         }
 
         public string Name { get { return "Window"; } }
@@ -31,7 +34,7 @@ namespace VirtualSpace.Platform.Windows.Device
             _source = new CancellationTokenSource();
             _rendererTask = Task.Run(() =>
             {
-                using (var renderer = new WindowOutputRenderer())
+                using (var renderer = new WindowOutputRenderer(_debugger))
                 {
                     bool isRunning = true;
                     _source.Token.Register(() => { if (isRunning) renderer.Exit(); }, true);

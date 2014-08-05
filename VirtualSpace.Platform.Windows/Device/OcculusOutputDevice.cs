@@ -2,6 +2,7 @@
 using System;
 using System.Threading;
 using System.Threading.Tasks;
+using VirtualSpace.Core;
 using VirtualSpace.Core.Device;
 using VirtualSpace.Platform.Windows.Rendering;
 
@@ -10,13 +11,15 @@ namespace VirtualSpace.Platform.Windows.Device
     public sealed class OcculusOutputDevice : IOutputDevice
     {
         private readonly DeviceManager _manager;
+        private readonly IDebugger _debugger;
 
         private CancellationTokenSource _source;
         private Task _rendererTask;
 
-        public OcculusOutputDevice(DeviceManager manager)
+        public OcculusOutputDevice(DeviceManager manager, IDebugger debugger)
         {
             _manager = manager;
+            _debugger = debugger;
 
             // Initialize OVR Library
             OVR.Initialize();
@@ -49,7 +52,7 @@ namespace VirtualSpace.Platform.Windows.Device
             _source = new CancellationTokenSource();
             _rendererTask = Task.Run(() =>
             {
-                using (var renderer = new OcculusOutputRenderer())
+                using (var renderer = new OcculusOutputRenderer(_debugger))
                 {
                     bool isRunning = true;
                     _source.Token.Register(() => { if (isRunning) renderer.Exit(); }, true);

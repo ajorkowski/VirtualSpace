@@ -2,13 +2,17 @@
 using SharpDX.Toolkit;
 using SharpDX.Toolkit.Graphics;
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
+using VirtualSpace.Core;
 
 namespace VirtualSpace.Platform.Windows.Rendering
 {
     internal sealed class FpsRenderer : GameSystem
     {
         private const string CpuCounterName = @"\Processor(0)\% Processor Time";
+
+        private readonly IDebugger _debugger;
 
         // FPS timers
         private int _fps;
@@ -23,11 +27,17 @@ namespace VirtualSpace.Platform.Windows.Rendering
 
         // Rendering
         private SpriteFont _spriteFont;
+        private SpriteFont _debuggingFont;
         private SpriteBatch _spriteBatch;
 
-        public FpsRenderer(Game game)
+        private List<string> _debugList;
+
+        public FpsRenderer(Game game, IDebugger debugger)
             : base(game)
         {
+            _debugger = debugger;
+            _debugList = new List<string>();
+
             Visible = true;
             Enabled = true;
 
@@ -66,6 +76,7 @@ namespace VirtualSpace.Platform.Windows.Rendering
             base.LoadContent();
 
             _spriteFont = ToDisposeContent(Content.Load<SpriteFont>("Arial16"));
+            _debuggingFont = ToDisposeContent(Content.Load<SpriteFont>("Arial12"));
             _spriteBatch = ToDisposeContent(new SpriteBatch(GraphicsDevice));
         }
 
@@ -99,6 +110,10 @@ namespace VirtualSpace.Platform.Windows.Rendering
             _spriteBatch.Begin();
 
             _spriteBatch.DrawString(_spriteFont, string.Format("fps: {0}, cpu: {1:0.00}%, mem: {2:0.00}mb", _fps, _cpu, _memory), new Vector2(10, 10), Color.White);
+            foreach(var d in _debugList)
+            {
+
+            }
 
             _spriteBatch.End();
         }

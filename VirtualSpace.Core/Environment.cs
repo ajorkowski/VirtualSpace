@@ -21,6 +21,8 @@ namespace VirtualSpace.Core
         private IVideo _videoSource;
         private IScreen _currentScreen;
 
+        private IScreen _desktopScreen;
+
         private List<string> _videos;
         private int _currentVideo;
         private bool _enableStereoDelay;
@@ -118,6 +120,7 @@ namespace VirtualSpace.Core
             {
                 _enableStereoDelay = !_enableStereoDelay;
                 _currentScreen.StereoDelayEnabled = _enableStereoDelay;
+                _desktopScreen.StereoDelayEnabled = _enableStereoDelay;
             }
 #endif
         }

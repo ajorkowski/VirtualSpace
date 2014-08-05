@@ -12,6 +12,8 @@ namespace VirtualSpace.Core
 {
     public sealed class Environment : IEnvironment, IDisposable
     {
+        private readonly IDebugger _debugger;
+
         private IInput _input;
         private IRenderer _renderer;
         private IScreenSourceFactory _screenFactory;
@@ -23,8 +25,9 @@ namespace VirtualSpace.Core
         private int _currentVideo;
         private bool _enableStereoDelay;
 
-        public Environment(IScreenSourceFactory screenFactory, IFolder folder)
+        public Environment(IScreenSourceFactory screenFactory, IFolder folder, IDebugger debugger)
         {
+            _debugger = debugger;
             VSync = true;
             _screenFactory = screenFactory;
             _enableStereoDelay = true;
@@ -76,10 +79,19 @@ namespace VirtualSpace.Core
                     _currentVideo = 0;
                 }
 
-                _videoSource = _screenFactory.OpenVideo(_videos[_currentVideo]);
-                //_currentSource = _screenFactory.OpenPrimaryDesktop();
-                _currentScreen = _renderer.ScreenManager.CreateScreen(_videoSource, 17.2f, 17.2f);
-                _currentScreen.StereoDelayEnabled = _enableStereoDelay;
+                var file = _videos[_currentVideo];
+                _debugger.WriteLine("Attempting to play file {0}", file);
+                try
+                {
+                    _videoSource = _screenFactory.OpenVideo(file);
+                    //_currentSource = _screenFactory.OpenPrimaryDesktop();
+                    _currentScreen = _renderer.ScreenManager.CreateScreen(_videoSource, 17.2f, 17.2f);
+                    _currentScreen.StereoDelayEnabled = _enableStereoDelay;
+                }
+                catch(NotSupportedException)
+                {
+                    _debugger.WriteLine("File {0} format is not supported", file);
+                }
 
                 _currentVideo++;
             }
@@ -174,16 +186,9 @@ namespace VirtualSpace.Core
 
         private async Task FindVideos(IFolder folder)
         {
-            try
-            {
-                var fold = await folder.GetFolderAsync("Videos");
-                var files = await fold.GetFilesAsync();
-                _videos.AddRange(files.Select(f => f.Path).Where(n => n.EndsWith(".wmv")));
-            }
-            catch (Exception e)
-            {
-                var test = e;
-            }
+            var fold = await folder.GetFolderAsync("Videos");
+            var files = await fold.GetFilesAsync();
+            _videos.AddRange(files.Select(f => f.Path));
         }
 
         public void Dispose()

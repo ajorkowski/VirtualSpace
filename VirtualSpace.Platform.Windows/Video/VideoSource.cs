@@ -69,7 +69,16 @@ namespace VirtualSpace.Platform.Windows.Video
                     // (ie pump Yv12 format into texture and do Yv12 -> rgb conversion in shader)
                     attr.Set(SourceReaderAttributeKeys.EnableVideoProcessing, 1); 
                 }
-                _reader = AddDisposable(new SourceReader(url.AbsoluteUri, attr));
+                try
+                {
+                    _reader = AddDisposable(new SourceReader(url.AbsoluteUri, attr));
+                }
+                catch(SharpDXException)
+                {
+                    _videoDevice.Dispose();
+                    _toDispose.Clear();
+                    throw new NotSupportedException();
+                }
             }
 
             // Enable default streams...

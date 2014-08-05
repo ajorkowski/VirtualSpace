@@ -12,6 +12,7 @@ namespace VideoDecoders.MediaFoundation.Mkv
     {
         public int BeginCreateObject(IMFByteStream pByteStream, string pwszURL, MFResolution dwFlags, IPropertyStore pProps, out object ppIUnknownCancelCookie, IMFAsyncCallback pCallback, object pUnkState)
         {
+            ppIUnknownCancelCookie = null;
             if(dwFlags != (MFResolution.MediaSource | MFResolution.Read | MFResolution.ContentDoesNotHaveToMatchExtensionOrMimeType))
             {
                 throw new InvalidOperationException("Only can use this byte stream handler to get a media source");
@@ -19,23 +20,34 @@ namespace VideoDecoders.MediaFoundation.Mkv
 
             Task.Run(() =>
             {
-                var wrapperStream = new IMFByteStreamWrapper(pByteStream);
-                var decoder = new MkvDecoder(wrapperStream, wrapperStream.Metadata);
-                var mediaSource = new MkvMediaSource(decoder);
+                MkvMediaSource mediaSource = null;
+
+                // Silently ignore errors, we will manage this later
+                try
+                {
+                    var wrapperStream = new IMFByteStreamWrapper(pByteStream);
+                    var decoder = new MkvDecoder(wrapperStream, wrapperStream.Metadata);
+                    mediaSource = new MkvMediaSource(decoder);
+                }
+                catch(Exception) { }
 
                 IMFAsyncResult result;
                 TestSuccess("Could not create async result", MFExtern.MFCreateAsyncResult(mediaSource, pCallback, pUnkState, out result));
                 TestSuccess("Could not invoke callback", MFExtern.MFInvokeCallback(result));
             });
 
-            ppIUnknownCancelCookie = null;
             return S_Ok;
         }
 
         public int EndCreateObject(IMFAsyncResult pResult, out MFObjectType pObjectType, out object ppObject)
         {
-            TestSuccess("Could not get callback object", pResult.GetObject(out ppObject));
+            var hr = pResult.GetObject(out ppObject);
             pObjectType = MFObjectType.MediaSource;
+            if (ppObject == null || hr < 0)
+            {
+                return MFError.MF_E_CANNOT_PARSE_BYTESTREAM;
+            }
+
             return S_Ok;
         }
 

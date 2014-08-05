@@ -52,11 +52,7 @@ namespace VirtualSpace.Platform.Windows.Video
                             throw new InvalidOperationException("The stream is not an audio type stream");
                         }
 
-                        var nativeSubType = nativeFormat.Get(MediaTypeAttributeKeys.Subtype);
-                        if (nativeSubType == AudioFormatGuids.Float || MediaAndDeviceManager.Current.HasDecoder(true, nativeSubType, AudioFormatGuids.Float))
-                        {
-                            supportedTypes.Add(nativeSubType);
-                        }
+                        supportedTypes.Add(nativeFormat.Get(MediaTypeAttributeKeys.Subtype));
                     }
                 }
                 catch (SharpDXException)
@@ -76,7 +72,14 @@ namespace VirtualSpace.Platform.Windows.Video
             {
                 audioFormat.Set(MediaTypeAttributeKeys.MajorType, MediaTypeGuids.Audio);
                 audioFormat.Set(MediaTypeAttributeKeys.Subtype, AudioFormatGuids.Float); // for XAudio2
-                _reader.SetCurrentMediaType(sourceIndex, audioFormat);
+                try
+                {
+                    _reader.SetCurrentMediaType(sourceIndex, audioFormat);
+                }
+                catch(SharpDXException)
+                {
+                    throw new NotSupportedException("Conversion is not supported for this audio type...");
+                }
             }
 
             using (var currentFormat = _reader.GetCurrentMediaType(sourceIndex))

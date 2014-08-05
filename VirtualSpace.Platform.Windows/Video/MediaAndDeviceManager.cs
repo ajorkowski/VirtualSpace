@@ -100,19 +100,6 @@ namespace VirtualSpace.Platform.Windows.Video
             return new VideoDevice(VideoMode.Software, null, new SharpDX.Direct3D11.Device(DriverType.Hardware, DeviceCreationFlags.BgraSupport), null);
         }
 
-        public bool HasDecoder(bool isAudio, Guid inputMediaSubType, Guid outputMediaSubType)
-        {
-            var majorType = isAudio ? MediaTypeGuids.Audio : MediaTypeGuids.Video;
-
-            var activates = MediaFactory.FindTransform(
-                isAudio ? TransformCategoryGuids.AudioDecoder : TransformCategoryGuids.VideoDecoder,
-                TransformEnumFlag.Syncmft | TransformEnumFlag.Localmft | TransformEnumFlag.SortAndFilter,
-                new TRegisterTypeInformation { GuidMajorType = majorType, GuidSubtype = inputMediaSubType },
-                new TRegisterTypeInformation { GuidMajorType = majorType, GuidSubtype = outputMediaSubType });
-
-            return activates.Length > 0;
-        }
-
         public void Dispose()
         {
             Utilities.Dispose(ref _masteringVoice);

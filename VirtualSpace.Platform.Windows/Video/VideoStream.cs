@@ -56,11 +56,7 @@ namespace VirtualSpace.Platform.Windows.Video
                             throw new InvalidOperationException("The stream is not a video type stream");
                         }
 
-                        var nativeSubType = nativeFormat.Get(MediaTypeAttributeKeys.Subtype);
-                        if (nativeSubType == GetVideoFormat() || MediaAndDeviceManager.Current.HasDecoder(false, nativeSubType, GetVideoFormat()))
-                        {
-                            supportedTypes.Add(nativeSubType);
-                        }
+                        supportedTypes.Add(nativeFormat.Get(MediaTypeAttributeKeys.Subtype));
                     }
                 }
                 catch (SharpDXException)
@@ -80,7 +76,14 @@ namespace VirtualSpace.Platform.Windows.Video
             {
                 videoFormat.Set(MediaTypeAttributeKeys.MajorType, MediaTypeGuids.Video);
                 videoFormat.Set(MediaTypeAttributeKeys.Subtype, GetVideoFormat());
-                _reader.SetCurrentMediaType(sourceIndex, videoFormat);
+                try
+                {
+                    _reader.SetCurrentMediaType(sourceIndex, videoFormat);
+                }
+                catch(SharpDXException)
+                {
+                    throw new NotSupportedException("Conversion is not supported for this video type...");
+                }
             }
 
             using (var currentFormat = _reader.GetCurrentMediaType(sourceIndex))

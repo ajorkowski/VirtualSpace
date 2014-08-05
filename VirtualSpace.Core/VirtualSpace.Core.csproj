@@ -63,6 +63,7 @@
     <Compile Include="Device\IDeviceManager.cs" />
     <Compile Include="Disposable.cs" />
     <Compile Include="IApplication.cs" />
+    <Compile Include="IDebugger.cs" />
     <Compile Include="IScreenSourceFactory.cs" />
     <Compile Include="Renderer\ICamera.cs" />
     <Compile Include="Environment.cs" />

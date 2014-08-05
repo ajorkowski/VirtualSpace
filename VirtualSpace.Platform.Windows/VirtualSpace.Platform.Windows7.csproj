@@ -87,7 +87,6 @@
     <Compile Include="Rendering\Screen\ScreenManager.cs" />
     <Compile Include="Rendering\Screen\ScreenOutput.cs" />
     <Compile Include="Rendering\Screen\ScreenRenderer.cs" />
-    <Compile Include="Desktop\DesktopDX11.cs" />
     <Compile Include="Desktop\DesktopGdi.cs" />
     <Compile Include="Video\AudioDelayEffect.cs" />
     <Compile Include="Video\AudioStream.cs" />

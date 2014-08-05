@@ -1,5 +1,4 @@
-﻿#if Win8
-using SharpDX;
+﻿using SharpDX;
 using SharpDX.Direct3D;
 using SharpDX.Direct3D11;
 using SharpDX.DXGI;
@@ -468,4 +467,3 @@ namespace VirtualSpace.Platform.Windows.Screen
         }
     }
 }
-#endif

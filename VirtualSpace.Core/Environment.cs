@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using VirtualSpace.Core.Desktop;
 using VirtualSpace.Core.Device;
 using VirtualSpace.Core.Renderer;
 using VirtualSpace.Core.Renderer.Screen;
@@ -18,14 +19,17 @@ namespace VirtualSpace.Core
         private IRenderer _renderer;
         private IScreenSourceFactory _screenFactory;
 
-        private IVideo _videoSource;
-        private IScreen _currentScreen;
-
+        private IDesktop _desktop;
         private IScreen _desktopScreen;
+
+        private IVideo _videoSource;
+        private IScreen _movieScreen;
 
         private List<string> _videos;
         private int _currentVideo;
         private bool _enableStereoDelay;
+
+        private string _movieToWatch;
 
         public Environment(IScreenSourceFactory screenFactory, IFolder folder, IDebugger debugger)
         {
@@ -50,10 +54,10 @@ namespace VirtualSpace.Core
 
         public void Uninitialise(IRenderer renderer)
         {
-            if (_currentScreen != null)
+            if (_movieScreen != null)
             {
-                _currentScreen.Dispose();
-                _currentScreen = null;
+                _movieScreen.Dispose();
+                _movieScreen = null;
             }
 
             if (_videoSource != null)
@@ -61,17 +65,34 @@ namespace VirtualSpace.Core
                 _videoSource.Dispose();
                 _videoSource = null;
             }
+
+            if(_desktopScreen != null)
+            {
+                _desktopScreen.Dispose();
+                _desktopScreen = null;
+            }
+
+            if(_desktop != null)
+            {
+                _desktop.Dispose();
+                _desktop = null;
+            }
+        }
+
+        public void WatchMovie(string file)
+        {
+            _movieToWatch = file;
         }
 
         public void Update(IRenderer renderer, TimeSpan totalGameTime, TimeSpan elapsedGameTime, bool isRunningSlowly)
         {
-            if (_videoSource != null && _videoSource.State == VideoState.Finished)
+            if (_videoSource != null && (_movieToWatch != null || _videoSource.State == VideoState.Finished))
             {
-                _currentScreen.Dispose();
+                _movieScreen.Dispose();
                 _videoSource.Dispose();
 
                 _videoSource = null;
-                _currentScreen = null;
+                _movieScreen = null;
             }
 
             if (_videoSource == null && _videos.Count > 0)
@@ -81,14 +102,14 @@ namespace VirtualSpace.Core
                     _currentVideo = 0;
                 }
 
-                var file = _videos[_currentVideo];
+                var file = _movieToWatch ?? _videos[_currentVideo];
+                _movieToWatch = null;
                 _debugger.WriteLine("Attempting to play file {0}", file);
                 try
                 {
                     _videoSource = _screenFactory.OpenVideo(file);
-                    //_currentSource = _screenFactory.OpenPrimaryDesktop();
-                    _currentScreen = _renderer.ScreenManager.CreateScreen(_videoSource, 17.2f, 17.2f);
-                    _currentScreen.StereoDelayEnabled = _enableStereoDelay;
+                    _movieScreen = _renderer.ScreenManager.CreateScreen(_videoSource, 17.2f, 17.2f);
+                    _movieScreen.StereoDelayEnabled = _enableStereoDelay;
                 }
                 catch(NotSupportedException)
                 {
@@ -105,6 +126,23 @@ namespace VirtualSpace.Core
 
             MoveCamera(elapsedGameTime);
 
+            if(_input.IsPressed(Keys.Z))
+            {
+                if(_desktop == null)
+                {
+                    _desktop = _screenFactory.OpenPrimaryDesktop();
+                    _desktopScreen = _renderer.ScreenManager.CreateScreen(_desktop, 0.762f, 0.762f);
+                    _desktopScreen.StereoDelayEnabled = _enableStereoDelay;
+                }
+                else
+                {
+                    _desktopScreen.Dispose();
+                    _desktop.Dispose();
+                    _desktopScreen = null;
+                    _desktop = null;
+                }
+            }
+
 #if DEBUG
             if (_input.IsPressed(Keys.V))
             {
@@ -116,11 +154,10 @@ namespace VirtualSpace.Core
                 ShowFPS = !ShowFPS;
             }
 
-            if(_input.IsPressed(Keys.N) && _currentScreen != null)
+            if(_input.IsPressed(Keys.N) && _movieScreen != null)
             {
                 _enableStereoDelay = !_enableStereoDelay;
-                _currentScreen.StereoDelayEnabled = _enableStereoDelay;
-                _desktopScreen.StereoDelayEnabled = _enableStereoDelay;
+                _movieScreen.StereoDelayEnabled = _enableStereoDelay;
             }
 #endif
         }
@@ -196,10 +233,10 @@ namespace VirtualSpace.Core
 
         public void Dispose()
         {
-            if (_currentScreen != null)
+            if (_movieScreen != null)
             {
-                _currentScreen.Dispose();
-                _currentScreen = null;
+                _movieScreen.Dispose();
+                _movieScreen = null;
             }
 
             if (_videoSource != null)

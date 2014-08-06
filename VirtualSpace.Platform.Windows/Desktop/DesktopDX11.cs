@@ -78,19 +78,7 @@ namespace VirtualSpace.Platform.Windows.Screen
 
         public ScreenOutput GetOutput(SharpDX.Direct3D11.Device device)
         {
-            var renderTexture = AddDisposable(new SharpDX.Direct3D11.Texture2D(device, new Texture2DDescription
-            {
-                CpuAccessFlags = CpuAccessFlags.None,
-                BindFlags = BindFlags.ShaderResource | BindFlags.RenderTarget,
-                Format = SharpDX.DXGI.Format.B8G8R8A8_UNorm,
-                Height = _nScreenHeight,
-                Width = _nScreenWidth,
-                OptionFlags = ResourceOptionFlags.SharedKeyedmutex,
-                MipLevels = 1,
-                ArraySize = 1,
-                SampleDescription = new SampleDescription(1, 0),
-                Usage = ResourceUsage.Default
-            }));
+            Texture2D renderTexture;
 
             //Output desktop;
             using (var factory = new Factory1())
@@ -99,17 +87,29 @@ namespace VirtualSpace.Platform.Windows.Screen
                 _nScreenWidth = desktop.Description.DesktopBounds.Width;
                 _nScreenHeight = desktop.Description.DesktopBounds.Height;
 
+                renderTexture = AddDisposable(new SharpDX.Direct3D11.Texture2D(device, new Texture2DDescription
+                {
+                    CpuAccessFlags = CpuAccessFlags.None,
+                    BindFlags = BindFlags.ShaderResource | BindFlags.RenderTarget,
+                    Format = SharpDX.DXGI.Format.B8G8R8A8_UNorm,
+                    Height = _nScreenHeight,
+                    Width = _nScreenWidth,
+                    OptionFlags = ResourceOptionFlags.SharedKeyedmutex,
+                    MipLevels = 1,
+                    ArraySize = 1,
+                    SampleDescription = new SampleDescription(1, 0),
+                    Usage = ResourceUsage.Default
+                }));
+
                 _captureDevice = AddDisposable(new SharpDX.Direct3D11.Device(DriverType.Hardware));
-                using (var sharedResource = renderTexture.QueryInterface<SharpDX.DXGI.Resource1>())
+                using (var sharedResource = renderTexture.QueryInterface<SharpDX.DXGI.Resource>())
                 {
                     _sharedTexture = AddDisposable(_captureDevice.OpenSharedResource<Texture2D>(sharedResource.SharedHandle));
                 }
 
                 _mutex = AddDisposable(_sharedTexture.QueryInterface<KeyedMutex>());
-                using (var output = new Output1(desktop.NativePointer))
-                {
-                    _outputDuplication = AddDisposable(output.DuplicateOutput(_captureDevice));
-                }
+                var output = AddDisposable(new Output1(desktop.NativePointer));
+                _outputDuplication = AddDisposable(output.DuplicateOutput(_captureDevice));
             }
 
             _isRunning = true;

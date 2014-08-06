@@ -11,6 +11,7 @@ namespace VirtualSpace.Platform.Windows.Device
     public sealed class DeviceManager : D.IDeviceManager, IDisposable
     {
         private readonly SingletonApplicationEnforcer _appEnforcer;
+        private readonly bool _shouldExit;
         private readonly NotifyIcon _trayIcon;
         private readonly ContextMenu _trayMenu;
         private readonly List<D.IOutputDevice> _outputDevices;
@@ -19,7 +20,10 @@ namespace VirtualSpace.Platform.Windows.Device
         
         public DeviceManager(IDebugger debugger)
         {
-            _outputDevices = new List<D.IOutputDevice>
+            _appEnforcer = new SingletonApplicationEnforcer(HandleApplicationOpening, "Virtual_Space");
+            _shouldExit = _appEnforcer.ShouldApplicationExit();
+
+            _outputDevices = _shouldExit ? new List<D.IOutputDevice>() : new List<D.IOutputDevice>
             {
                 new OcculusOutputDevice(this, debugger),
                 new WindowOutputDevice(this, debugger)
@@ -60,6 +64,14 @@ namespace VirtualSpace.Platform.Windows.Device
         public void Exit()
         {
             System.Windows.Forms.Application.Exit();
+        }
+
+        private void HandleApplicationOpening(IEnumerable<string> args)
+        {
+            if(_environment != null && args != null && args.Any())
+            {
+                _environment.WatchMovie(args.First());
+            }
         }
 
         private MenuItem[] CreateMenuItems(IEnumerable<D.MenuItem> menuItems)

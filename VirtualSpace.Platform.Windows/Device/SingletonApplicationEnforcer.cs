@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.IO;
 using System.IO.MemoryMappedFiles;
 using System.Threading;
+using System.Threading.Tasks;
 
 namespace VirtualSpace.Platform.Windows.Device
 {
@@ -12,12 +13,15 @@ namespace VirtualSpace.Platform.Windows.Device
     /// <summary>
     /// This class allows restricting the number of executables in execution, to one.
     /// </summary>
-    public sealed class SingletonApplicationEnforcer
+    public sealed class SingletonApplicationEnforcer : IDisposable
     {
-        readonly Action<IEnumerable<string>> processArgsFunc;
-        readonly string applicationId;
-        Thread thread;
-        string argDelimiter = "_;;_";
+        private readonly Action<IEnumerable<string>> _processArgsFunc;
+        private readonly string _applicationId;
+
+        private EventWaitHandle _eventWaitHandle;
+        private Task _task;
+        private string _argDelimiter = "_;;_";
+        private bool _isRunning;
 
         /// <summary>
         /// Gets or sets the string that is used to join 
@@ -28,11 +32,11 @@ namespace VirtualSpace.Platform.Windows.Device
         {
             get
             {
-                return argDelimiter;
+                return _argDelimiter;
             }
             set
             {
-                argDelimiter = value;
+                _argDelimiter = value;
             }
         }
 
@@ -49,8 +53,8 @@ namespace VirtualSpace.Platform.Windows.Device
             {
                 throw new ArgumentNullException("processArgsFunc");
             }
-            this.processArgsFunc = processArgsFunc;
-            this.applicationId = applicationId;
+            this._processArgsFunc = processArgsFunc;
+            this._applicationId = applicationId;
         }
 
         /// <summary>
@@ -61,13 +65,17 @@ namespace VirtualSpace.Platform.Windows.Device
         /// otherwise <c>false</c>.</returns>
         public bool ShouldApplicationExit()
         {
+            if(_isRunning)
+            {
+                throw new InvalidOperationException();
+            }
+
             bool createdNew;
-            string argsWaitHandleName = "ArgsWaitHandle_" + applicationId;
-            string memoryFileName = "ArgFile_" + applicationId;
+            string argsWaitHandleName = "ArgsWaitHandle_" + _applicationId;
+            string memoryFileName = "ArgFile_" + _applicationId;
 
-            EventWaitHandle argsWaitHandle = new EventWaitHandle(false, EventResetMode.AutoReset, argsWaitHandleName, out createdNew);
-
-            GC.KeepAlive(argsWaitHandle);
+            _isRunning = true;
+            _eventWaitHandle = new EventWaitHandle(false, EventResetMode.AutoReset, argsWaitHandleName, out createdNew);
 
             if (createdNew)
             {
@@ -75,15 +83,20 @@ namespace VirtualSpace.Platform.Windows.Device
                     * A thread is created to service the MemoryMappedFile. 
                     * We repeatedly examine this file each time the argsWaitHandle 
                     * is Set by a non-singleton application instance. */
-                thread = new Thread(() =>
+                _task = Task.Run(() =>
                 {
                     try
                     {
                         using (MemoryMappedFile file = MemoryMappedFile.CreateOrOpen(memoryFileName, 10000))
                         {
-                            while (true)
+                            while (_isRunning)
                             {
-                                argsWaitHandle.WaitOne();
+                                _eventWaitHandle.WaitOne();
+                                if(!_isRunning)
+                                {
+                                    break;
+                                }
+
                                 using (MemoryMappedViewStream stream = file.CreateViewStream())
                                 {
                                     var reader = new BinaryReader(stream);
@@ -97,8 +110,8 @@ namespace VirtualSpace.Platform.Windows.Device
                                         Debug.WriteLine("Unable to retrieve string. " + ex);
                                         continue;
                                     }
-                                    string[] argsSplit = args.Split(new string[] { argDelimiter }, StringSplitOptions.RemoveEmptyEntries);
-                                    processArgsFunc(argsSplit);
+                                    string[] argsSplit = args.Split(new string[] { _argDelimiter }, StringSplitOptions.RemoveEmptyEntries);
+                                    _processArgsFunc(argsSplit);
                                 }
 
                             }
@@ -109,29 +122,38 @@ namespace VirtualSpace.Platform.Windows.Device
                         Debug.WriteLine("Unable to monitor memory file. " + ex);
                     }
                 });
-
-                thread.IsBackground = true;
-                thread.Start();
             }
             else
             {
                 /* Non singleton application instance. 
                     * Should exit, after passing command line args to singleton process, 
                     * via the MemoryMappedFile. */
-                using (MemoryMappedFile mmf = MemoryMappedFile.OpenExisting(memoryFileName))
+                using (var mmf = MemoryMappedFile.OpenExisting(memoryFileName))
+                using (var stream = mmf.CreateViewStream())
                 {
-                    using (MemoryMappedViewStream stream = mmf.CreateViewStream())
-                    {
-                        var writer = new BinaryWriter(stream);
-                        string[] args = Environment.GetCommandLineArgs();
-                        string joined = string.Join(argDelimiter, args);
-                        writer.Write(joined);
-                    }
+                    var writer = new BinaryWriter(stream);
+                    string[] args = Environment.GetCommandLineArgs();
+                    string joined = string.Join(_argDelimiter, args);
+                    writer.Write(joined);
                 }
-                argsWaitHandle.Set();
+                _eventWaitHandle.Set();
             }
 
             return !createdNew;
+        }
+
+        public void Dispose()
+        {
+            if (_isRunning)
+            {
+                _isRunning = false;
+                _eventWaitHandle.Set();
+                _task.Wait();
+                _task.Dispose();
+                _task = null;
+                _eventWaitHandle.Dispose();
+                _eventWaitHandle = null;
+            }
         }
     }
 }

@@ -92,7 +92,6 @@
     <Compile Include="Video\AudioDelayEffect.cs" />
     <Compile Include="Video\AudioStream.cs" />
     <Compile Include="Video\MediaAndDeviceManager.cs" />
-    <Compile Include="Video\SpeakerConfiguration.cs" />
     <Compile Include="Video\VideoDevice.cs" />
     <Compile Include="Video\VideoSource.cs" />
     <Compile Include="Rendering\WindowOutputRenderer.cs" />

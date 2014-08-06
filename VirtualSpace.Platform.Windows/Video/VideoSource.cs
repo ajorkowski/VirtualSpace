@@ -12,10 +12,6 @@ namespace VirtualSpace.Platform.Windows.Video
 {
     internal sealed class VideoSource : IVideo, IScreenSource
     {
-        private const int MF_SOURCE_READER_FIRST_VIDEO_STREAM = unchecked((int)(0xFFFFFFFC));
-        private const int MF_SOURCE_READER_FIRST_AUDIO_STREAM = unchecked((int)(0xFFFFFFFD));
-        private const int MF_SOURCE_READER_ALL_STREAMS = unchecked((int)(0xFFFFFFFE));
-
         private readonly List<IDisposable> _toDispose;
         private readonly List<VirtualSpace.Core.Video.StreamMetadata> _streamMetadata;
 
@@ -45,6 +41,23 @@ namespace VirtualSpace.Platform.Windows.Video
             _isBuffering = true;
             _isAudioBuffering = true;
 
+            try
+            {
+                Initialise(file);
+            }
+            catch(Exception)
+            {
+                foreach (var d in _toDispose)
+                {
+                    d.Dispose();
+                }
+                _toDispose.Clear();
+                throw;
+            }
+        }
+
+        private void Initialise(string file)
+        {
             // Creates an URL to the file
             var url = new Uri(file, UriKind.RelativeOrAbsolute);
 
@@ -75,16 +88,14 @@ namespace VirtualSpace.Platform.Windows.Video
                 }
                 catch(SharpDXException)
                 {
-                    _videoDevice.Dispose();
-                    _toDispose.Clear();
                     throw new NotSupportedException();
                 }
             }
 
             // Enable default streams...
-            _reader.SetStreamSelection(MF_SOURCE_READER_ALL_STREAMS, false);
-            _reader.SetStreamSelection(MF_SOURCE_READER_FIRST_VIDEO_STREAM, true);
-            _reader.SetStreamSelection(MF_SOURCE_READER_FIRST_AUDIO_STREAM, true);
+            _reader.SetStreamSelection(SourceReaderIndex.AllStreams, false);
+            _reader.SetStreamSelection(SourceReaderIndex.FirstVideoStream, true);
+            _reader.SetStreamSelection(SourceReaderIndex.FirstAudioStream, true);
 
             // Grab out some metadata...
             _canSeek = GetCanSeek(_reader);
@@ -150,15 +161,15 @@ namespace VirtualSpace.Platform.Windows.Video
             }
 
             // Create the default video stream...
-            _videoStream = AddDisposable(new VideoStream(_reader, _videoDevice, MF_SOURCE_READER_FIRST_VIDEO_STREAM));
+            _videoStream = AddDisposable(new VideoStream(_reader, _videoDevice, (int)SourceReaderIndex.FirstVideoStream));
 
             try
             {
-                _audioStream = AddDisposable(new AudioStream(_reader, MF_SOURCE_READER_FIRST_AUDIO_STREAM));
+                _audioStream = AddDisposable(new AudioStream(_reader, (int)SourceReaderIndex.FirstAudioStream));
             }
             catch (NotSupportedException)
             {
-                _reader.SetStreamSelection(MF_SOURCE_READER_FIRST_AUDIO_STREAM, false);
+                _reader.SetStreamSelection((int)SourceReaderIndex.FirstAudioStream, false);
             }
             
             _state = VideoState.Paused;

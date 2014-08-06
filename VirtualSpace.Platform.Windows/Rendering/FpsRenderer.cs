@@ -30,13 +30,10 @@ namespace VirtualSpace.Platform.Windows.Rendering
         private SpriteFont _debuggingFont;
         private SpriteBatch _spriteBatch;
 
-        private List<string> _debugList;
-
         public FpsRenderer(Game game, IDebugger debugger)
             : base(game)
         {
             _debugger = debugger;
-            _debugList = new List<string>();
 
             Visible = true;
             Enabled = true;
@@ -110,9 +107,11 @@ namespace VirtualSpace.Platform.Windows.Rendering
             _spriteBatch.Begin();
 
             _spriteBatch.DrawString(_spriteFont, string.Format("fps: {0}, cpu: {1:0.00}%, mem: {2:0.00}mb", _fps, _cpu, _memory), new Vector2(10, 10), Color.White);
-            foreach(var d in _debugList)
+            int count = 0;
+            foreach(var d in _debugger.LastWrites)
             {
-
+                _spriteBatch.DrawString(_debuggingFont, d, new Vector2(10, 30 + count * 14), Color.White);
+                count ++;
             }
 
             _spriteBatch.End();

@@ -10,12 +10,13 @@ namespace VirtualSpace.Platform.Windows.Device
 {
     public sealed class DeviceManager : D.IDeviceManager, IDisposable
     {
-        private NotifyIcon _trayIcon;
-        private ContextMenu _trayMenu;
+        private readonly SingletonApplicationEnforcer _appEnforcer;
+        private readonly NotifyIcon _trayIcon;
+        private readonly ContextMenu _trayMenu;
+        private readonly List<D.IOutputDevice> _outputDevices;
+
         private IEnvironment _environment;
-
-        private List<D.IOutputDevice> _outputDevices;
-
+        
         public DeviceManager(IDebugger debugger)
         {
             _outputDevices = new List<D.IOutputDevice>

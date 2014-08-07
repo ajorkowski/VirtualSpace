@@ -5,6 +5,7 @@ using SharpDX.DXGI;
 using System;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
+using System.Threading;
 using System.Threading.Tasks;
 using VirtualSpace.Core.Desktop;
 using VirtualSpace.Platform.Windows.Rendering.Screen;
@@ -25,6 +26,7 @@ namespace VirtualSpace.Platform.Windows.Screen
         private int _nScreenHeight;
 
         private SharpDX.Direct3D11.Device _captureDevice;
+        private Output1 _output;
         private OutputDuplication _outputDuplication;
         private KeyedMutex _mutex;
 
@@ -81,36 +83,34 @@ namespace VirtualSpace.Platform.Windows.Screen
             Texture2D renderTexture;
 
             //Output desktop;
-            using (var factory = new Factory1())
-            using (var desktop = factory.Adapters1[0].Outputs[0])
+            var factory = AddDisposable(new Factory1());
+            var desktop = AddDisposable(factory.Adapters1[0].Outputs[0]);
+
+            _nScreenWidth = desktop.Description.DesktopBounds.Width;
+            _nScreenHeight = desktop.Description.DesktopBounds.Height;
+
+            renderTexture = AddDisposable(new SharpDX.Direct3D11.Texture2D(device, new Texture2DDescription
             {
-                _nScreenWidth = desktop.Description.DesktopBounds.Width;
-                _nScreenHeight = desktop.Description.DesktopBounds.Height;
+                CpuAccessFlags = CpuAccessFlags.None,
+                BindFlags = BindFlags.ShaderResource | BindFlags.RenderTarget,
+                Format = SharpDX.DXGI.Format.B8G8R8A8_UNorm,
+                Height = _nScreenHeight,
+                Width = _nScreenWidth,
+                OptionFlags = ResourceOptionFlags.SharedKeyedmutex,
+                MipLevels = 1,
+                ArraySize = 1,
+                SampleDescription = new SampleDescription(1, 0),
+                Usage = ResourceUsage.Default
+            }));
 
-                renderTexture = AddDisposable(new SharpDX.Direct3D11.Texture2D(device, new Texture2DDescription
-                {
-                    CpuAccessFlags = CpuAccessFlags.None,
-                    BindFlags = BindFlags.ShaderResource | BindFlags.RenderTarget,
-                    Format = SharpDX.DXGI.Format.B8G8R8A8_UNorm,
-                    Height = _nScreenHeight,
-                    Width = _nScreenWidth,
-                    OptionFlags = ResourceOptionFlags.SharedKeyedmutex,
-                    MipLevels = 1,
-                    ArraySize = 1,
-                    SampleDescription = new SampleDescription(1, 0),
-                    Usage = ResourceUsage.Default
-                }));
-
-                _captureDevice = AddDisposable(new SharpDX.Direct3D11.Device(DriverType.Hardware));
-                using (var sharedResource = renderTexture.QueryInterface<SharpDX.DXGI.Resource>())
-                {
-                    _sharedTexture = AddDisposable(_captureDevice.OpenSharedResource<Texture2D>(sharedResource.SharedHandle));
-                }
-
-                _mutex = AddDisposable(_sharedTexture.QueryInterface<KeyedMutex>());
-                var output = AddDisposable(new Output1(desktop.NativePointer));
-                _outputDuplication = AddDisposable(output.DuplicateOutput(_captureDevice));
+            _captureDevice = AddDisposable(new SharpDX.Direct3D11.Device(DriverType.Hardware));
+            using (var sharedResource = renderTexture.QueryInterface<SharpDX.DXGI.Resource>())
+            {
+                _sharedTexture = AddDisposable(_captureDevice.OpenSharedResource<Texture2D>(sharedResource.SharedHandle));
             }
+
+            _mutex = AddDisposable(_sharedTexture.QueryInterface<KeyedMutex>());
+            _output = AddDisposable(new Output1(desktop.NativePointer));
 
             _isRunning = true;
             _captureLoop = Task.Run(() => CaptureLoop());
@@ -132,6 +132,23 @@ namespace VirtualSpace.Platform.Windows.Screen
 
             while (_isRunning)
             {
+                if (_outputDuplication == null)
+                {
+                    try
+                    {
+                        _outputDuplication = _output.DuplicateOutput(_captureDevice);
+                    }
+                    catch(SharpDXException e)
+                    {
+                        if(e.ResultCode == Result.InvalidArg)
+                        {
+                            Thread.Sleep(100);
+                            continue;
+                        }
+                        throw;
+                    }
+                }
+
                 SharpDX.DXGI.Resource resource;
                 OutputDuplicateFrameInformation frameInfo;
                 try
@@ -455,6 +472,17 @@ namespace VirtualSpace.Platform.Windows.Screen
             {
                 _mouseMoveTexture2.Dispose();
                 _mouseMoveTexture2 = null;
+            }
+
+            if(_outputDuplication != null)
+            {
+                try
+                {
+                    _outputDuplication.ReleaseFrame();
+                }
+                catch (SharpDXException) { }
+                _outputDuplication.Dispose();
+                _outputDuplication = null;
             }
 
             foreach (var d in _toDispose)

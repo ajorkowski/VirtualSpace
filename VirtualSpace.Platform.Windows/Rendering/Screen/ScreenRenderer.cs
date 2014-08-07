@@ -29,7 +29,7 @@ namespace VirtualSpace.Platform.Windows.Rendering.Screen
 
         private GeometricPrimitive _plane;
         private SharpDX.Direct3D11.ShaderResourceView _planeShaderView;
-        private Matrix _planeTransform;
+        private Matrix _scale;
         private KeyedMutex _renderMutex;
 
         private X3DAudio _x3DAudio;
@@ -107,7 +107,7 @@ namespace VirtualSpace.Platform.Windows.Rendering.Screen
             }
 
             var screenWidth = (float)(ScreenSize * Math.Cos(Math.Atan2(desc.Height, desc.Width)));
-            _planeTransform = Matrix.Scaling(screenWidth / (float)desc.Width);
+            _scale = Matrix.Scaling(screenWidth / (float)desc.Width);
             _basicEffect.TextureView = _planeShaderView;
             _posDirty = true;
 
@@ -211,7 +211,13 @@ namespace VirtualSpace.Platform.Windows.Rendering.Screen
 
             if(_posDirty)
             {
-                _basicEffect.World = _planeTransform * Matrix.LookAtRH(_position, _lookAt, Vector3.Up);
+                var rot = Matrix.LookAtRH(Vector3.Zero, _lookAt - _position, Vector3.Up);
+                rot.Transpose();
+                var mat = _scale * rot * Matrix.Translation(_position);
+                Vector3 v1, v2;
+                Quaternion q2;
+                mat.Decompose(out v1, out q2, out v2);
+                _basicEffect.World = mat;
                 _posDirty = false;
             }
 

@@ -1,12 +1,16 @@
-﻿namespace VirtualSpace.Core.Renderer
+﻿using VirtualSpace.Core.Math;
+
+namespace VirtualSpace.Core.Renderer
 {
     public interface ICamera
     {
-        void MoveRelative(float x, float y, float z);
-        void RotateRelative(float x, float y, float z);
-        void MoveAbsolute(float x, float y, float z);
-        void MoveTo(float x, float y, float z);
+        void MoveRelative(Vec3 vec);
+        void RotateRelative(Vec3 rot);
+        void MoveAbsolute(Vec3 move);
+        void MoveTo(Vec3 pos);
 
-        void LookAt(float x, float y, float z);
+        void LookAt(Vec3 pos);
+
+        Vec3 FindPointInWorldSpace(Vec3 pos);
     }
 }

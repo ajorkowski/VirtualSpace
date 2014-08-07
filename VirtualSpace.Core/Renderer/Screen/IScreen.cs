@@ -1,4 +1,5 @@
 ﻿using System;
+using VirtualSpace.Core.Math;
 
 namespace VirtualSpace.Core.Renderer.Screen
 {
@@ -16,5 +17,8 @@ namespace VirtualSpace.Core.Renderer.Screen
 
         bool HasStereoDelay { get; }
         bool StereoDelayEnabled { get; set; }
+
+        void SetPosition(Vec3 pos);
+        void SetFacing(Vec3 pos);
     }
 }

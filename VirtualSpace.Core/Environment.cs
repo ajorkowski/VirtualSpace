@@ -5,6 +5,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using VirtualSpace.Core.Desktop;
 using VirtualSpace.Core.Device;
+using VirtualSpace.Core.Math;
 using VirtualSpace.Core.Renderer;
 using VirtualSpace.Core.Renderer.Screen;
 using VirtualSpace.Core.Video;
@@ -16,7 +17,6 @@ namespace VirtualSpace.Core
         private readonly IDebugger _debugger;
 
         private IInput _input;
-        private IRenderer _renderer;
         private IScreenSourceFactory _screenFactory;
 
         private IDesktop _desktop;
@@ -47,9 +47,8 @@ namespace VirtualSpace.Core
         public void Initialise(IRenderer renderer, IInput input)
         {
             _input = input;
-            _renderer = renderer;
-            _renderer.Camera.MoveTo(0, 0, 20);
-            _renderer.Camera.LookAt(0, 0, 0);
+            renderer.Camera.MoveTo(new Vec3(0, 0, 20));
+            renderer.Camera.LookAt(new Vec3());
         }
 
         public void Uninitialise(IRenderer renderer)
@@ -108,7 +107,8 @@ namespace VirtualSpace.Core
                 try
                 {
                     _videoSource = _screenFactory.OpenVideo(file);
-                    _movieScreen = _renderer.ScreenManager.CreateScreen(_videoSource, 17.2f, 17.2f);
+                    _movieScreen = renderer.ScreenManager.CreateScreen(_videoSource, 17.2f, 17.2f);
+                    _movieScreen.SetFacing(new Vec3(0, 0, 1));
                     _movieScreen.StereoDelayEnabled = _enableStereoDelay;
                 }
                 catch(NotSupportedException)
@@ -124,14 +124,16 @@ namespace VirtualSpace.Core
                 _videoSource.Play();
             }
 
-            MoveCamera(elapsedGameTime);
+            MoveCamera(elapsedGameTime, renderer);
 
             if(_input.IsPressed(Keys.Z))
             {
                 if(_desktop == null)
                 {
                     _desktop = _screenFactory.OpenPrimaryDesktop();
-                    _desktopScreen = _renderer.ScreenManager.CreateScreen(_desktop, 0.762f, 0.762f);
+                    _desktopScreen = renderer.ScreenManager.CreateScreen(_desktop, 0.762f, 0.762f);
+                    _desktopScreen.SetPosition(renderer.Camera.FindPointInWorldSpace(new Vec3(0, 0, -1)));
+                    _desktopScreen.SetFacing(renderer.Camera.FindPointInWorldSpace(new Vec3()));
                     _desktopScreen.StereoDelayEnabled = _enableStereoDelay;
                 }
                 else
@@ -165,7 +167,7 @@ namespace VirtualSpace.Core
         public bool VSync { get; private set; }
         public bool ShowFPS { get; private set; }
 
-        private void MoveCamera(TimeSpan elapsedGameTime)
+        private void MoveCamera(TimeSpan elapsedGameTime, IRenderer renderer)
         {
             float z = 0;
             float x = 0;
@@ -173,12 +175,12 @@ namespace VirtualSpace.Core
 
             if (_input.IsDown(Keys.W))
             {
-                z -= velocity;
+                z += velocity;
             }
 
             if (_input.IsDown(Keys.S))
             {
-                z += velocity;
+                z -= velocity;
             }
 
             if (_input.IsDown(Keys.A))
@@ -193,7 +195,7 @@ namespace VirtualSpace.Core
 
             if (z != 0 || x != 0)
             {
-                _renderer.Camera.MoveRelative(x, 0, z);
+                renderer.Camera.MoveRelative(new Vec3(x, 0, z));
             }
 
             float xRot = 0;
@@ -220,7 +222,7 @@ namespace VirtualSpace.Core
 
             if (xRot != 0 || yRot != 0)
             {
-                _renderer.Camera.RotateRelative(xRot, yRot, 0);
+                renderer.Camera.RotateRelative(new Vec3(xRot, yRot, 0));
             }
         }
 
@@ -233,17 +235,7 @@ namespace VirtualSpace.Core
 
         public void Dispose()
         {
-            if (_movieScreen != null)
-            {
-                _movieScreen.Dispose();
-                _movieScreen = null;
-            }
-
-            if (_videoSource != null)
-            {
-                _videoSource.Dispose();
-                _videoSource = null;
-            }
+            Uninitialise(null);
         }
     }
 }

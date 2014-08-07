@@ -52,7 +52,7 @@ namespace VirtualSpace.Platform.Windows.Device
             _source = new CancellationTokenSource();
             _rendererTask = Task.Run(() =>
             {
-                using (var renderer = new OcculusOutputRenderer(_debugger))
+                using (var renderer = new OcculusOutputRenderer(_debugger, 90))
                 {
                     bool isRunning = true;
                     _source.Token.Register(() => { if (isRunning) renderer.Exit(); }, true);

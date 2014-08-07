@@ -65,6 +65,7 @@
     <Compile Include="IApplication.cs" />
     <Compile Include="IDebugger.cs" />
     <Compile Include="IScreenSourceFactory.cs" />
+    <Compile Include="Math\Vec3.cs" />
     <Compile Include="Renderer\ICamera.cs" />
     <Compile Include="Environment.cs" />
     <Compile Include="Renderer\IRenderer.cs" />

@@ -1,6 +1,7 @@
 ﻿using SharpDX;
 using SharpDX.Toolkit;
 using SharpDX.Toolkit.Graphics;
+using System;
 using System.Linq;
 using VirtualSpace.Core;
 using VirtualSpace.Core.Device;
@@ -22,9 +23,7 @@ namespace VirtualSpace.Platform.Windows.Rendering
         private FpsRenderer _fpsRenderer;
         private IEnvironment _environment;
 
-        private bool _currentVSync;
-
-        public WindowOutputRenderer(IDebugger debugger)
+        public WindowOutputRenderer(IDebugger debugger, int targetFPS)
         {
             _debugger = debugger;
 
@@ -40,6 +39,9 @@ namespace VirtualSpace.Platform.Windows.Rendering
             Content.RootDirectory = "Content";
 
             IsMouseVisible = true;
+            _device.SynchronizeWithVerticalRetrace = false;
+            IsFixedTimeStep = true;
+            TargetElapsedTime = TimeSpan.FromMilliseconds(1000 / (double)targetFPS);
         }
 
         public IInput Input { get { return _keyboardProvider; } }
@@ -62,19 +64,11 @@ namespace VirtualSpace.Platform.Windows.Rendering
             base.Initialize();
 
             _environment.Initialise(this, _keyboardProvider);
-
-            _currentVSync = GraphicsDevice.Presenter.PresentInterval != PresentInterval.Immediate;
         }
 
         protected override void Update(GameTime gameTime)
         {
             _environment.Update(this, gameTime.TotalGameTime, gameTime.ElapsedGameTime, gameTime.IsRunningSlowly);
-
-            if (_environment.VSync != _currentVSync)
-            {
-                GraphicsDevice.Presenter.PresentInterval = _environment.VSync ? PresentInterval.One : PresentInterval.Immediate;
-                _currentVSync = _environment.VSync;
-            }
 
             _fpsRenderer.Enabled = _environment.ShowFPS;
             _fpsRenderer.Visible = _environment.ShowFPS;

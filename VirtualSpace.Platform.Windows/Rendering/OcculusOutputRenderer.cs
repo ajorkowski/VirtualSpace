@@ -26,8 +26,6 @@ namespace VirtualSpace.Platform.Windows.Rendering
         private FpsRenderer _fpsRenderer;
         private IEnvironment _environment;
 
-        private bool _currentVSync;
-
         private HMD _hmd;
         private Rect[] _eyeRenderViewport;
         private D3D11TextureData[] _eyeTexture;
@@ -39,7 +37,7 @@ namespace VirtualSpace.Platform.Windows.Rendering
         private EyeRenderDesc[] _eyeRenderDesc;
         private PoseF[] _renderPose = new PoseF[2];
 
-        public OcculusOutputRenderer(IDebugger debugger)
+        public OcculusOutputRenderer(IDebugger debugger, int targetFPS)
         {
             _debugger = debugger;
 
@@ -73,6 +71,9 @@ namespace VirtualSpace.Platform.Windows.Rendering
             // Match back buffer size with HMD resolution
             _device.PreferredBackBufferWidth = _hmd.Resolution.Width;
             _device.PreferredBackBufferHeight = _hmd.Resolution.Height;
+            _device.SynchronizeWithVerticalRetrace = false;
+            IsFixedTimeStep = true;
+            TargetElapsedTime = TimeSpan.FromMilliseconds(1000 / (double)targetFPS);
         }
 
         public IInput Input { get { return _keyboardProvider; } }
@@ -171,8 +172,6 @@ namespace VirtualSpace.Platform.Windows.Rendering
             base.Initialize();
 
             _environment.Initialise(this, _keyboardProvider);
-
-            _currentVSync = GraphicsDevice.Presenter.PresentInterval != PresentInterval.Immediate;
         }
 
         protected override void Update(GameTime gameTime)
@@ -181,12 +180,6 @@ namespace VirtualSpace.Platform.Windows.Rendering
             _cameraProvider.UseBaseMatrix();
 
             _environment.Update(this, gameTime.TotalGameTime, gameTime.ElapsedGameTime, gameTime.IsRunningSlowly);
-
-            if (_environment.VSync != _currentVSync)
-            {
-                GraphicsDevice.Presenter.PresentInterval = _environment.VSync ? PresentInterval.One : PresentInterval.Immediate;
-                _currentVSync = _environment.VSync;
-            }
 
             _fpsRenderer.Enabled = _environment.ShowFPS;
             _fpsRenderer.Visible = _environment.ShowFPS;

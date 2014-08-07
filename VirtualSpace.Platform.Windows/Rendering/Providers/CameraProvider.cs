@@ -1,5 +1,6 @@
 ﻿using SharpDX;
 using SharpDX.Toolkit;
+using VirtualSpace.Core.Math;
 using VirtualSpace.Core.Renderer;
 
 namespace VirtualSpace.Platform.Windows.Rendering.Providers
@@ -31,42 +32,53 @@ namespace VirtualSpace.Platform.Windows.Rendering.Providers
             _view = Matrix.Identity;
         }
 
-        public void MoveRelative(float x, float y, float z)
+        public void MoveRelative(Vec3 move)
         {
-            _view = _view * Matrix.Translation(x, y, -z);
+            _view = _view * Matrix.Translation(move.X, move.Y, move.Z);
         }
 
-        public void RotateRelative(float x, float y, float z)
+        public void RotateRelative(Vec3 rot)
         {
-            if (x != 0)
+            if (rot.X != 0)
             {
-                _view = _view * Matrix.RotationX(x);
+                _view = _view * Matrix.RotationX(rot.X);
             }
 
-            if (y != 0)
+            if (rot.Y != 0)
             {
-                _view = _view * Matrix.RotationY(y);
+                _view = _view * Matrix.RotationY(rot.Y);
             }
 
-            if (z != 0)
+            if (rot.Z != 0)
             {
-                _view = _view * Matrix.RotationZ(z);
+                _view = _view * Matrix.RotationZ(rot.Z);
             }
         }
 
-        public void MoveAbsolute(float x, float y, float z)
+        public void MoveAbsolute(Vec3 move)
         {
-            _view = Matrix.Translation(x, y, -z) * _view;
+            _view = Matrix.Translation(move.X, move.Y, move.Z) * _view;
         }
 
-        public void MoveTo(float x, float y, float z)
+        public void MoveTo(Vec3 pos)
         {
-            _view.TranslationVector = new Vector3(x, y, z);
+            _view.TranslationVector = Vector3.Zero;
+            _view = Matrix.Translation(pos.X, pos.Y, pos.Z) * _view;
         }
 
-        public void LookAt(float x, float y, float z)
+        public void LookAt(Vec3 pos)
         {
-            _view = Matrix.LookAtRH(_view.TranslationVector, new Vector3(x, y, z), _view.Up);
+            _view = Matrix.LookAtRH(_view.TranslationVector, new Vector3(pos.X, pos.Y, pos.Z), _view.Up);
+        }
+
+        public Vec3 FindPointInWorldSpace(Vec3 pos)
+        {
+            var p = new Vector3(pos.X, pos.Y, pos.Z);
+            var inv = _view;
+            inv.Invert();
+            Vector3 res;
+            Vector3.Transform(ref p, ref inv, out res);
+            return new Vec3(res.X, res.Y, res.Z);
         }
     }
 }

@@ -12,7 +12,6 @@ namespace VirtualSpace.Core
         void Update(IRenderer renderer, TimeSpan totalGameTime, TimeSpan elapsedGameTime, bool isRunningSlowly);
         void Uninitialise(IRenderer renderer);
 
-        bool VSync { get; }
         bool ShowFPS { get; }
     }
 }

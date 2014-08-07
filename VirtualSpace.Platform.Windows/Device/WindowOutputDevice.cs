@@ -34,7 +34,7 @@ namespace VirtualSpace.Platform.Windows.Device
             _source = new CancellationTokenSource();
             _rendererTask = Task.Run(() =>
             {
-                using (var renderer = new WindowOutputRenderer(_debugger))
+                using (var renderer = new WindowOutputRenderer(_debugger, 60))
                 {
                     bool isRunning = true;
                     _source.Token.Register(() => { if (isRunning) renderer.Exit(); }, true);

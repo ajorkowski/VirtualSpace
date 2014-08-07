@@ -9,6 +9,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using VirtualSpace.Core;
+using VirtualSpace.Core.Math;
 using VirtualSpace.Core.Renderer.Screen;
 using VirtualSpace.Platform.Windows.Rendering.Providers;
 using VirtualSpace.Platform.Windows.Video;
@@ -22,6 +23,10 @@ namespace VirtualSpace.Platform.Windows.Rendering.Screen
         private readonly Dictionary<Speakers, SpeakerOutput> _speakerOutputs;
 
         private BasicEffect _basicEffect;
+        private Vector3 _position;
+        private Vector3 _lookAt;
+        private bool _posDirty;
+
         private GeometricPrimitive _plane;
         private SharpDX.Direct3D11.ShaderResourceView _planeShaderView;
         private Matrix _planeTransform;
@@ -41,6 +46,10 @@ namespace VirtualSpace.Platform.Windows.Rendering.Screen
             _cameraService = camera;
             _speakerOutputs = new Dictionary<Speakers, SpeakerOutput>();
             _enableStereoDelay = true;
+            _posDirty = true;
+            _position = Vector3.Zero;
+            _lookAt = Vector3.ForwardRH;
+
             Visible = true;
             Enabled = true;
             ScreenSize = screenSize;
@@ -100,7 +109,7 @@ namespace VirtualSpace.Platform.Windows.Rendering.Screen
             var screenWidth = (float)(ScreenSize * Math.Cos(Math.Atan2(desc.Height, desc.Width)));
             _planeTransform = Matrix.Scaling(screenWidth / (float)desc.Width);
             _basicEffect.TextureView = _planeShaderView;
-            _basicEffect.World = _planeTransform;
+            _posDirty = true;
 
             /********************************************
              * SETUP AUDIO
@@ -126,19 +135,19 @@ namespace VirtualSpace.Platform.Windows.Rendering.Screen
                     throw new InvalidOperationException("Only support Mono, Stereo, 5.1 input sound currently");
                 }
 
-                _speakerOutputs.Add(Speakers.FrontLeft, CreateSpeakerOutput(sampleRate, distanceBase));
-                _speakerOutputs.Add(Speakers.FrontRight, CreateSpeakerOutput(sampleRate, distanceBase));
+                _speakerOutputs.Add(Speakers.FrontLeft, CreateSpeakerOutput(sampleRate, distanceBase, outputChannels));
+                _speakerOutputs.Add(Speakers.FrontRight, CreateSpeakerOutput(sampleRate, distanceBase, outputChannels));
 
                 if (sourceAudioChannels > 6)
                 {
-                    _speakerOutputs.Add(Speakers.FrontCenter, CreateSpeakerOutput(sampleRate, distanceBase));
-                    _speakerOutputs.Add(Speakers.BackLeft, CreateSpeakerOutput(sampleRate, distanceBase));
-                    _speakerOutputs.Add(Speakers.BackRight, CreateSpeakerOutput(sampleRate, distanceBase));
+                    _speakerOutputs.Add(Speakers.FrontCenter, CreateSpeakerOutput(sampleRate, distanceBase, outputChannels));
+                    _speakerOutputs.Add(Speakers.BackLeft, CreateSpeakerOutput(sampleRate, distanceBase, outputChannels));
+                    _speakerOutputs.Add(Speakers.BackRight, CreateSpeakerOutput(sampleRate, distanceBase, outputChannels));
 
                     // Ignore LF if we only have headphones...
                     if (!_stereoVirtualisation)
                     {
-                        _speakerOutputs.Add(Speakers.LowFrequency, CreateSpeakerOutput(sampleRate, distanceBase));
+                        _speakerOutputs.Add(Speakers.LowFrequency, CreateSpeakerOutput(sampleRate, distanceBase, outputChannels));
                     }
                 }
 
@@ -182,11 +191,7 @@ namespace VirtualSpace.Platform.Windows.Rendering.Screen
                     Velocity = new Vector3(0, 0, 0)
                 };
 
-                if(_stereoVirtualisation)
-                {
-                    SetupStereoVirtualisation(sampleRate);
-                }
-                else
+                if(!_stereoVirtualisation)
                 {
                     _lowFreqOutput = new float[6] { 0, 0, 0, 1f, 0, 0 };
                 }
@@ -203,6 +208,12 @@ namespace VirtualSpace.Platform.Windows.Rendering.Screen
         public override void Update(GameTime gameTime)
         {
             base.Update(gameTime);
+
+            if(_posDirty)
+            {
+                _basicEffect.World = _planeTransform * Matrix.LookAtRH(_position, _lookAt, Vector3.Up);
+                _posDirty = false;
+            }
 
             _source.Update(gameTime);
             _basicEffect.View = _cameraService.View;
@@ -307,10 +318,33 @@ namespace VirtualSpace.Platform.Windows.Rendering.Screen
             }
         }
 
-        private SpeakerOutput CreateSpeakerOutput(int sampleRate, float minDistance)
+        public void SetPosition(Vec3 pos)
         {
-            var voice = new SubmixVoice(MediaAndDeviceManager.Current.AudioEngine, 1, sampleRate, SubmixVoiceFlags.None, 10);
+            _position.X = pos.X;
+            _position.Y = pos.Y;
+            _position.Z = pos.Z;
+            _posDirty = true;
+        }
+
+        public void SetFacing(Vec3 pos)
+        {
+            _lookAt.X = pos.X;
+            _lookAt.Y = pos.Y;
+            _lookAt.Z = pos.Z;
+            _posDirty = true;
+        }
+
+        private SpeakerOutput CreateSpeakerOutput(int sampleRate, float minDistance, int outputChannels)
+        {
+            // TODO: Reenable when 2.6.3 SharpDX comes out with fixes I added
+            //var desc = new EffectDescriptor(new AudioDelayEffect(1000), outputChannels);
+            var voice = new SubmixVoice(MediaAndDeviceManager.Current.AudioEngine, 1, sampleRate, SubmixVoiceFlags.None, 10 /*, desc*/);
             ToDisposeContent(new Disposable(() => { voice.DestroyVoice(); voice.Dispose(); }));
+            //voice.SetEffectParameters<AudioDelayParam>(0, new AudioDelayParam { Delays = new float[outputChannels] });
+            //if (!_enableStereoDelay)
+            //{
+            //    voice.DisableEffect(0);
+            //}
 
             voice.SetVolume((float)(1.0 / Math.Pow(2, minDistance)));
 
@@ -327,21 +361,6 @@ namespace VirtualSpace.Platform.Windows.Rendering.Screen
                     Velocity = new Vector3(0, 0, 0)
                 }
             };
-        }
-
-        private void SetupStereoVirtualisation(int sampleRate)
-        {
-            // TODO: Reenable when 2.6.3 SharpDX comes out with fixes I added
-            //foreach(var o in _speakerOutputs.Where(s => s.Key != Speakers.LowFrequency))
-            //{
-            //    o.Value.Voice.SetEffectChain(new EffectDescriptor(new AudioDelayEffect(1000)));
-            //    o.Value.Voice.SetEffectParameters<AudioDelayParam>(0, new AudioDelayParam { LeftDelay = 0, RightDelay = 0 });
-
-            //    if (!_enableStereoDelay)
-            //    {
-            //        o.Value.Voice.DisableEffect(0);
-            //    }
-            //}
         }
 
         private static GeometricPrimitive CreateCurvedSurface(GraphicsDevice device, float distance, float width, float height, int tessellation)
@@ -362,12 +381,12 @@ namespace VirtualSpace.Platform.Windows.Rendering.Screen
             {
                 var iBase = i * 2;
                 indices[currentIndex++] = iBase;
-                indices[currentIndex++] = iBase + 1;
                 indices[currentIndex++] = iBase + 3;
+                indices[currentIndex++] = iBase + 1;
 
                 indices[currentIndex++] = iBase;
-                indices[currentIndex++] = iBase + 3;
                 indices[currentIndex++] = iBase + 2;
+                indices[currentIndex++] = iBase + 3;
             }
 
             return new GeometricPrimitive(device, vertices, indices) { Name = "Half cylinder" }; 
@@ -391,16 +410,16 @@ namespace VirtualSpace.Platform.Windows.Rendering.Screen
 
                 // Top coord
                 var x = distance * (float)Math.Sin(currentAngle);
-                var z = distance * (1 - (float)Math.Cos(currentAngle)); // Will be positive, means towards the user in RHS
+                var z = distance * ((float)Math.Cos(currentAngle) - 1); // Will be negative, means towards the user in RHS
                 var position = new Vector3(x, sizeY, z);
-                var normal = new Vector3(-x, 0, -z); // shared normal for both points
+                var normal = new Vector3(-x, 0, z); // shared normal for both points
                 normal.Normalize();
-                var textCoord = new Vector2(1 - i * invTes, 0);
+                var textCoord = new Vector2(i * invTes, 0);
                 vertices[currentVertex++] = new VertexPositionNormalTexture(position, normal, textCoord);
 
                 // Bottom coord
                 position = new Vector3(x, -sizeY, z);
-                textCoord = new Vector2(1 - i * invTes, 1);
+                textCoord = new Vector2(i * invTes, 1);
                 vertices[currentVertex++] = new VertexPositionNormalTexture(position, normal, textCoord);
             }
         }

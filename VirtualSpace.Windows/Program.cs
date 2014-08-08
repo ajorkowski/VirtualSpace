@@ -24,7 +24,7 @@ namespace VirtualSpace.Window
             TinyIoCContainer.Current.Register<IFolder>(new FileSystemFolder(Path.Combine(Directory.GetCurrentDirectory(), "Content"), false));
 
             var app = TinyIoCContainer.Current.Resolve<IApplication>();
-            app.Run();
+            app.Run(args);
             TinyIoCContainer.Current.Dispose();
         }
     }

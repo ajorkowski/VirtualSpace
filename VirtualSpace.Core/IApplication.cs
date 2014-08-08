@@ -4,6 +4,6 @@ namespace VirtualSpace.Core
 {
     public interface IApplication
     {
-        void Run();
+        void Run(string[] args);
     }
 }

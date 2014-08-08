@@ -189,14 +189,13 @@ namespace VirtualSpace.Platform.Windows.Rendering
 
         protected override void Draw(GameTime gameTime)
         {
-            // Set Render Target and Viewport
             GraphicsDevice.SetRenderTargets(_depthStencilBuffer, _renderTarget);
-            GraphicsDevice.SetViewport(0f, 0f, _renderTarget.Width, _renderTarget.Height);
+
+            // Clear
+            GraphicsDevice.Clear(Color.CornflowerBlue);
 
             // Begin frame
             _hmd.BeginFrame(0);
-
-            GraphicsDevice.Clear(Color.CornflowerBlue);
 
             for (int eyeIndex = 0; eyeIndex < 2; eyeIndex++)
             {
@@ -205,7 +204,7 @@ namespace VirtualSpace.Platform.Windows.Rendering
 
                 _cameraProvider.UseOcculusEye(ref _eyeRenderDesc[(int)eye], ref _renderPose[(int)eye]);
 
-                // Set Viewport for our eye
+                // Set Render Target and Viewport
                 GraphicsDevice.SetViewport(_eyeRenderViewport[(int)eye].ToViewportF());
 
                 // Perform the actual drawing

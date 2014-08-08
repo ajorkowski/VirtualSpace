@@ -18,12 +18,21 @@ namespace VirtualSpace.Core
             _environment = environment;
         }
 
-        public void Run()
+        public void Run(string[] args)
         {
             RefreshMenu();
 
-            RunDevice(_deviceManager.GetDevices().First(d => d.IsAvailable));
-            _deviceManager.Run(_environment);
+            var devices = _deviceManager.GetDevices();
+            if (devices != null)
+            {
+                if(args.Any())
+                {
+                    _environment.WatchMovie(args[0]);
+                }
+
+                RunDevice(devices.First(d => d.IsAvailable));
+                _deviceManager.Run(_environment);
+            }
         }
 
         private void RunDevice(IOutputDevice device)

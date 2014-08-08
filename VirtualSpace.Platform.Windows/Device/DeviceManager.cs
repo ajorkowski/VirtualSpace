@@ -23,21 +23,24 @@ namespace VirtualSpace.Platform.Windows.Device
             _appEnforcer = new SingletonApplicationEnforcer(HandleApplicationOpening, "Virtual_Space");
             _shouldExit = _appEnforcer.ShouldApplicationExit();
 
-            _outputDevices = _shouldExit ? new List<D.IOutputDevice>() : new List<D.IOutputDevice>
+            if (!_shouldExit)
             {
-                new OcculusOutputDevice(this, debugger),
-                new WindowOutputDevice(this, debugger)
-            };
+                _outputDevices = new List<D.IOutputDevice>
+                {
+                    new OcculusOutputDevice(this, debugger),
+                    new WindowOutputDevice(this, debugger)
+                };
 
-            _trayMenu = new ContextMenu();
+                _trayMenu = new ContextMenu();
 
-            _trayIcon = new NotifyIcon();
-            _trayIcon.Text = "Virtual Space";
-            _trayIcon.Icon = new Icon(SystemIcons.Application, 40, 40);
+                _trayIcon = new NotifyIcon();
+                _trayIcon.Text = "Virtual Space";
+                _trayIcon.Icon = new Icon(SystemIcons.Application, 40, 40);
 
-            // Add menu to tray icon and show it.
-            _trayIcon.ContextMenu = _trayMenu;
-            _trayIcon.Visible = true;
+                // Add menu to tray icon and show it.
+                _trayIcon.ContextMenu = _trayMenu;
+                _trayIcon.Visible = true;
+            }
         }
 
         public IEnumerable<D.IOutputDevice> GetDevices()
@@ -68,9 +71,9 @@ namespace VirtualSpace.Platform.Windows.Device
 
         private void HandleApplicationOpening(IEnumerable<string> args)
         {
-            if(_environment != null && args != null && args.Any())
+            if(_environment != null && args != null && args.Count() > 1)
             {
-                _environment.WatchMovie(args.First());
+                _environment.WatchMovie(args.Skip(1).First());
             }
         }
 

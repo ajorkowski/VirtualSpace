@@ -228,17 +228,17 @@ namespace VirtualSpace.Platform.Windows.Video
 
         public void Dispose()
         {
-            AudioFrame f;
-            while (_bufferedFrames.TryDequeue(out f) || _unusedFrames.TryTake(out f) || _playingFrames.TryDequeue(out f))
-            {
-                Utilities.FreeMemory(f.MemBuffer.Pointer);
-            }
-
             foreach (var d in _toDispose)
             {
                 d.Dispose();
             }
             _toDispose.Clear();
+
+            AudioFrame f;
+            while (_bufferedFrames.TryDequeue(out f) || _unusedFrames.TryTake(out f) || _playingFrames.TryDequeue(out f))
+            {
+                Utilities.FreeMemory(f.MemBuffer.Pointer);
+            }
 
             GC.SuppressFinalize(this);
         }

@@ -18,14 +18,40 @@ namespace VideoDecoders.MediaFoundation.DirectShowAudio
 
         public readonly static MFTRegisterTypeInfo[] Outputs = new MFTRegisterTypeInfo[]
         {
-            new MFTRegisterTypeInfo { guidMajorType = MFMediaType.Audio, guidSubtype = MediaSubTypes.MEDIASUBTYPE_IEEE_FLOAT }
+            new MFTRegisterTypeInfo { guidMajorType = MFMediaType.Audio, guidSubtype = MediaSubTypes.MEDIASUBTYPE_IEEE_FLOAT },
+            new MFTRegisterTypeInfo { guidMajorType = MFMediaType.Audio, guidSubtype = MediaSubTypes.MEDIASUBTYPE_PCM }
         };
 
         private IMFMediaType _inputType;
         private IMFMediaType _outputType;
 
-        private WaveFormatEx _waveFormat;
-        private int _waveFormatSize;
+        public int ProcessMessage(MFTMessageType eMessage, IntPtr ulParam)
+        {
+            if(_inputType == null || _outputType == null)
+            {
+                return MFError.MF_E_TRANSFORM_TYPE_NOT_SET;
+            }
+
+            switch(eMessage)
+            {
+                case MFTMessageType.NotifyBeginStreaming:
+                    Initialise();
+                    break;
+                // These are messages we can safely ignore
+                case MFTMessageType.SetD3DManager:
+                    break;
+                // We have not implemented these messages
+                default:
+                    return E_NotImplemented;
+            }
+
+            return S_Ok;
+        }
+
+        private void Initialise()
+        {
+
+        }
 
         public int GetStreamCount(MFInt pcInputStreams, MFInt pcOutputStreams)
         {
@@ -126,29 +152,11 @@ namespace VideoDecoders.MediaFoundation.DirectShowAudio
                 }
             }
 
-            WaveFormatEx ex = null;
-            int size = 0;
-            if(isValid)
-            {
-                // Only support audio types that have a waveformatex value
-                isValid = MFExtern.MFCreateWaveFormatExFromMFMediaType(pType, out ex, out size, MFWaveFormatExConvertFlags.Normal) == S_Ok;
-            }
-
             if (!isValid) { return MFError.MF_E_INVALIDMEDIATYPE; }
             if (dwFlags == MFTSetTypeFlags.TestOnly) { return S_Ok; }
 
-            if(_inputType == null)
-            {
-                TestSuccess("Could not create media type", MFExtern.MFCreateMediaType(out _inputType));
-            }
-            else
-            {
-                TestSuccess("Could not clear existing media type attributes", _inputType.DeleteAllItems());
-            }
-
-            TestSuccess("Could not copy media type attributes", pType.CopyAllItems(_inputType));
-            _waveFormat = ex;
-            _waveFormatSize = size;
+            // Looks like we are supposed to copy reference this type...
+            _inputType = pType;
             return S_Ok;
         }
 
@@ -202,8 +210,8 @@ namespace VideoDecoders.MediaFoundation.DirectShowAudio
                 return MFError.MF_E_INVALIDMEDIATYPE;
             }
 
-            // Need input type first... so we can copy waveformat!
-            if(_inputType == null || _waveFormat == null)
+            // Need input type first... so we can copy details!
+            if(_inputType == null)
             {
                 return MFError.MF_E_TRANSFORM_TYPE_NOT_SET;
             }
@@ -232,19 +240,45 @@ namespace VideoDecoders.MediaFoundation.DirectShowAudio
             if (!isValid) { return MFError.MF_E_INVALIDMEDIATYPE; }
             if (dwFlags == MFTSetTypeFlags.TestOnly) { return S_Ok; }
 
-            if (_outputType == null)
+            // Looks like we are supposed to copy reference this type
+            _outputType = pType;
+
+            // Calculate derived values.
+            // http://msdn.microsoft.com/en-us/library/windows/desktop/ff485864(v=vs.85).aspx
+            int cChannels;
+            if(_outputType.GetUINT32(MFAttributesClsid.MF_MT_AUDIO_NUM_CHANNELS, out cChannels) != S_Ok && _inputType.GetUINT32(MFAttributesClsid.MF_MT_AUDIO_NUM_CHANNELS, out cChannels) != S_Ok)
             {
-                TestSuccess("Could not create media type", MFExtern.MFCreateMediaType(out _outputType));
-            }
-            else
-            {
-                TestSuccess("Could not clear existing media type attributes", _outputType.DeleteAllItems());
+                return MFError.MF_E_INVALIDMEDIATYPE;
             }
 
-            TestSuccess("Could not copy waveformatex attributes", MFExtern.MFInitMediaTypeFromWaveFormatEx(_outputType, _waveFormat, _waveFormatSize));
-            
-            TestSuccess("Could not set major type attribute", _outputType.SetGUID(MFAttributesClsid.MF_MT_MAJOR_TYPE, majorType));
-            TestSuccess("Could not set subtype attribute", _outputType.SetGUID(MFAttributesClsid.MF_MT_SUBTYPE, subType));
+            int samplesPerSec;
+            if (_outputType.GetUINT32(MFAttributesClsid.MF_MT_AUDIO_SAMPLES_PER_SECOND, out samplesPerSec) != S_Ok && _inputType.GetUINT32(MFAttributesClsid.MF_MT_AUDIO_SAMPLES_PER_SECOND, out samplesPerSec) != S_Ok)
+            {
+                return MFError.MF_E_INVALIDMEDIATYPE;
+            }
+
+            int bitsPerSample;
+            if (_outputType.GetUINT32(MFAttributesClsid.MF_MT_AUDIO_BITS_PER_SAMPLE, out bitsPerSample) != S_Ok && _inputType.GetUINT32(MFAttributesClsid.MF_MT_AUDIO_BITS_PER_SAMPLE, out bitsPerSample) != S_Ok)
+            {
+                bitsPerSample = subType == MediaSubTypes.MEDIASUBTYPE_IEEE_FLOAT ? 32 : 16; // Apparently a good default
+            }
+
+            var blockAlign = cChannels * (bitsPerSample / 8);
+            var bytesPerSecond = blockAlign * samplesPerSec;
+
+            // Set all the expected audio types... this will override existing values... but I guess other transforms will take care of type transforms?
+            _outputType.SetUINT32(MFAttributesClsid.MF_MT_AUDIO_NUM_CHANNELS, cChannels);
+            _outputType.SetUINT32(MFAttributesClsid.MF_MT_AUDIO_SAMPLES_PER_SECOND, samplesPerSec);
+            _outputType.SetUINT32(MFAttributesClsid.MF_MT_AUDIO_BLOCK_ALIGNMENT, blockAlign);
+            _outputType.SetUINT32(MFAttributesClsid.MF_MT_AUDIO_AVG_BYTES_PER_SECOND, bytesPerSecond);
+            _outputType.SetUINT32(MFAttributesClsid.MF_MT_AUDIO_BITS_PER_SAMPLE, bitsPerSample);
+            _outputType.SetUINT32(MFAttributesClsid.MF_MT_ALL_SAMPLES_INDEPENDENT, 1);
+
+            int channelMask;
+            if (_outputType.GetUINT32(MFAttributesClsid.MF_MT_AUDIO_CHANNEL_MASK, out channelMask) == S_Ok || _inputType.GetUINT32(MFAttributesClsid.MF_MT_AUDIO_CHANNEL_MASK, out channelMask) == S_Ok)
+            {
+                _outputType.SetUINT32(MFAttributesClsid.MF_MT_AUDIO_CHANNEL_MASK, channelMask);
+            }
 
             return S_Ok;
         }
@@ -288,11 +322,6 @@ namespace VideoDecoders.MediaFoundation.DirectShowAudio
         }
 
         public int ProcessInput(int dwInputStreamID, IMFSample pSample, int dwFlags)
-        {
-            throw new NotImplementedException();
-        }
-
-        public int ProcessMessage(MFTMessageType eMessage, IntPtr ulParam)
         {
             throw new NotImplementedException();
         }

@@ -50,6 +50,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="DirectShowAudio\DirectShowAudioDecoderTransform.cs" />
+    <Compile Include="DirectShowAudio\DirectShowAudioGraph.cs" />
     <Compile Include="IMFByteStreamWrapper.cs" />
     <Compile Include="MediaSubTypes.cs" />
     <Compile Include="Mkv\IMkvTrack.cs" />

@@ -24,11 +24,6 @@ namespace VideoDecoders.MediaFoundation.Mkv
 
         protected override IMFMediaType CreateMediaType(TrackEntry entry)
         {
-            IMFMediaType type;
-            TestSuccess("Could not create media type", MFExtern.MFCreateMediaType(out type));
-
-            TestSuccess("Could not set video type", type.SetGUID(MFAttributesClsid.MF_MT_MAJOR_TYPE, MFMediaType.Video));
-
             Guid subtype;
             switch (entry.CodecID)
             {
@@ -39,8 +34,13 @@ namespace VideoDecoders.MediaFoundation.Mkv
                     subtype = MFMediaType.H264;
                     break;
                 default:
-                    throw new InvalidOperationException("Unknown codec type");
+                    return null;
             }
+
+            IMFMediaType type;
+            TestSuccess("Could not create media type", MFExtern.MFCreateMediaType(out type));
+
+            TestSuccess("Could not set video type", type.SetGUID(MFAttributesClsid.MF_MT_MAJOR_TYPE, MFMediaType.Video));
 
             TestSuccess("Could not set video subtype", type.SetGUID(MFAttributesClsid.MF_MT_SUBTYPE, subtype));
 

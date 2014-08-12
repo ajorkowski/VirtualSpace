@@ -23,11 +23,6 @@ namespace VideoDecoders.MediaFoundation.Mkv
 
         protected override IMFMediaType CreateMediaType(TrackEntry entry)
         {
-            IMFMediaType type;
-            TestSuccess("Could not create media type", MFExtern.MFCreateMediaType(out type));
-
-            TestSuccess("Could not set audio type", type.SetGUID(MFAttributesClsid.MF_MT_MAJOR_TYPE, MFMediaType.Audio));
-
             Guid subtype;
             switch (entry.CodecID)
             {
@@ -35,14 +30,25 @@ namespace VideoDecoders.MediaFoundation.Mkv
                     // http://msdn.microsoft.com/en-us/library/windows/desktop/dd390676(v=vs.85).aspx
                     subtype = MFMediaType.MPEG;
                     break;
+                case "A_DTS":
+                    subtype = MediaSubTypes.MEDIASUBTYPE_DTS;
+                    break;
+                case "A_AC3":
+                    subtype = MediaSubTypes.MEDIASUBTYPE_DOLBY_AC3;
+                    break;
                 default:
-                    throw new InvalidOperationException("Unknown codec type");
+                    return null;
             }
+
+            IMFMediaType type;
+            TestSuccess("Could not create media type", MFExtern.MFCreateMediaType(out type));
+
+            TestSuccess("Could not set audio type", type.SetGUID(MFAttributesClsid.MF_MT_MAJOR_TYPE, MFMediaType.Audio));
 
             TestSuccess("Could not set audio subtype", type.SetGUID(MFAttributesClsid.MF_MT_SUBTYPE, subtype));
 
-            //TestSuccess("Could not set number of channels", type.SetUINT32(MFAttributesClsid.MF_MT_AUDIO_NUM_CHANNELS, (int)entry.Audio.Channels));
-            //TestSuccess("Could not set the sample rate", type.SetUINT32(MFAttributesClsid.MF_MT_AUDIO_SAMPLES_PER_SECOND, (int)entry.Audio.SamplingFrequency));
+            TestSuccess("Could not set number of channels", type.SetUINT32(MFAttributesClsid.MF_MT_AUDIO_NUM_CHANNELS, (int)entry.Audio.Channels));
+            TestSuccess("Could not set the sample rate", type.SetUINT32(MFAttributesClsid.MF_MT_AUDIO_SAMPLES_PER_SECOND, (int)entry.Audio.SamplingFrequency));
 
             // TODO: Channel Mask?
             //TestSuccess("Could not set channel mask", type.SetUINT32(MFAttributesClsid.MF_MT_AUDIO_CHANNEL_MASK, (int)entry.Audio.SamplingFrequency));

@@ -40,16 +40,22 @@ namespace VideoDecoders.MediaFoundation.Mkv
 
             foreach (var t in _decoder.Metadata.Tracks)
             {
-                if (t.TrackType == TrackType.Video)
+                try
                 {
-                    _tracks.Add(new MkvVideoTrack(t, this));
-                }
+                    if (t.TrackType == TrackType.Video)
+                    {
+                        _tracks.Add(new MkvVideoTrack(t, this));
+                    }
 
-                if (t.TrackType == TrackType.Audio)
-                {
-                    _tracks.Add(new MkvAudioTrack(t, this));
+                    if (t.TrackType == TrackType.Audio)
+                    {
+                        _tracks.Add(new MkvAudioTrack(t, this));
+                    }
                 }
+                catch(NotSupportedException) { }
             }
+
+            if (_tracks.Count == 0) { throw new NotSupportedException("Could not find any supported tracks"); }
 
             TestSuccess("Could not create presentation descriptor", MFExtern.MFCreatePresentationDescriptor(_tracks.Count, _tracks.Select(t => t.Descriptor).ToArray(), out _descriptor));
             _descriptor.SetUINT64(MFAttributesClsid.MF_PD_DURATION, (long)(_decoder.Metadata.Info.Duration / 100));

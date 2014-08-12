@@ -138,7 +138,7 @@ namespace VirtualSpace.Platform.Windows.Rendering.Screen
                 _speakerOutputs.Add(Speakers.FrontLeft, CreateSpeakerOutput(sampleRate, distanceBase, outputChannels));
                 _speakerOutputs.Add(Speakers.FrontRight, CreateSpeakerOutput(sampleRate, distanceBase, outputChannels));
 
-                if (sourceAudioChannels > 6)
+                if (sourceAudioChannels >= 6)
                 {
                     _speakerOutputs.Add(Speakers.FrontCenter, CreateSpeakerOutput(sampleRate, distanceBase, outputChannels));
                     _speakerOutputs.Add(Speakers.BackLeft, CreateSpeakerOutput(sampleRate, distanceBase, outputChannels));

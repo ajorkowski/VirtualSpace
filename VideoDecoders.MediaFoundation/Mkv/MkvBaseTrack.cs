@@ -24,13 +24,18 @@ namespace VideoDecoders.MediaFoundation.Mkv
 
         public MkvBaseTrack(TrackEntry entry, MkvMediaSource mediaSource)
         {
+            var mediaType = CreateMediaType(entry);
+            if(mediaType == null)
+            {
+                throw new NotSupportedException("Could not work out the right media type");
+            }
+
             _entry = entry;
             _mediaSource = mediaSource;
             _tokenQueue = new ConcurrentQueue<object>();
 
             TestSuccess("Could not create event queue for video track", MFExtern.MFCreateEventQueue(out _eventQueue));
 
-            var mediaType = CreateMediaType(entry);
             TestSuccess("Could not create stream descriptor", MFExtern.MFCreateStreamDescriptor((int)entry.TrackNumber, 1, new IMFMediaType[] { mediaType }, out _descriptor));
 
             // Add Stream descriptor attributes from the track information

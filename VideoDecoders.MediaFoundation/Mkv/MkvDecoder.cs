@@ -134,6 +134,7 @@ namespace VideoDecoders.MediaFoundation.Mkv
 
             if (!isSimple)
             {
+                // TODO: Implement Block reading
                 throw new NotImplementedException();
             }
 

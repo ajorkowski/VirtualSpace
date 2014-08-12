@@ -1,10 +1,11 @@
-﻿using MediaFoundation;
-using Microsoft.Win32;
+﻿using Microsoft.Win32;
 using System;
 using System.Linq;
 using System.Runtime.InteropServices;
 using System.Security;
+using VideoDecoders.MediaFoundation.DirectShowAudio;
 using VideoDecoders.MediaFoundation.Mkv;
+using MF = MediaFoundation;
 
 namespace VideoDecoders.MediaFoundation
 {
@@ -30,7 +31,7 @@ namespace VideoDecoders.MediaFoundation
             try
             {
                 // Try to register a local mkv handler (only Win8)
-                MFRegisterLocalByteStreamHandler(".mkv", "video/x-matroska", new MkvDecoderActivator());
+                TestSuccess("Could not register local byte stream handler", MFRegisterLocalByteStreamHandler(".mkv", "video/x-matroska", new MkvDecoderActivator()));
             }
             catch(EntryPointNotFoundException)
             {
@@ -39,6 +40,17 @@ namespace VideoDecoders.MediaFoundation
                 var handlerWriteKey = CreateKey(Registry.CurrentUser, "Software", "Microsoft", "Windows Media Foundation", "ByteStreamHandlers", ".mkv");
                 handlerWriteKey.SetValue(mkvByteStreamKey, "VideoDecoders.MediaFoundation.MkvDecoderByteStreamHandler", RegistryValueKind.String);
             }
+
+            TestSuccess("Could not unregister decoder", MF.MFExtern.MFTUnregister(typeof(DirectShowAudioDecoderTransform).GUID));
+            TestSuccess("Could not register ffdshow audio decoder", MF.MFExtern.MFTRegister(typeof(DirectShowAudioDecoderTransform).GUID,
+                MF.MFTransformCategory.MFT_CATEGORY_AUDIO_DECODER,
+                "ffdshow Audio Decoder Wrapper",
+                0,
+                DirectShowAudioDecoderTransform.Inputs.Length,
+                DirectShowAudioDecoderTransform.Inputs,
+                DirectShowAudioDecoderTransform.Outputs.Length,
+                DirectShowAudioDecoderTransform.Outputs,
+                null));
         }
 
         private static RegistryKey OpenKey(RegistryKey key, params string[] keys)
@@ -64,6 +76,14 @@ namespace VideoDecoders.MediaFoundation
         }
 
         [DllImport("mfplat.dll", ExactSpelling = true), SuppressUnmanagedCodeSecurity]
-        private extern static int MFRegisterLocalByteStreamHandler([In]string fileExtension, [In]string mimeType, [In]IMFActivate activate);
+        private extern static int MFRegisterLocalByteStreamHandler([In]string fileExtension, [In]string mimeType, [In]MF.IMFActivate activate);
+
+        private static void TestSuccess(string message, int hResult)
+        {
+            if (hResult < 0)
+            {
+                throw new COMException(message, hResult);
+            }
+        }
     }
 }

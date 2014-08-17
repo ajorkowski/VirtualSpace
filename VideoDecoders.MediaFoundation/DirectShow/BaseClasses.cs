@@ -12007,7 +12007,7 @@ namespace DirectShow.BaseClasses
     {
         #region Constructor
 
-        protected BaseFileSourceFilter(string _name, FileParser _parser)
+        public BaseFileSourceFilter(string _name, FileParser _parser)
             : base(_name)
         {
             if (_parser != null)

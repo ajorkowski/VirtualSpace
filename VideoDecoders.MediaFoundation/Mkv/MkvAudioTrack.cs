@@ -91,21 +91,5 @@ namespace VideoDecoders.MediaFoundation.Mkv
 
             return buffer;
         }
-
-        //private string byteToBitsString(byte byteIn)
-        //{
-        //    var bitsString = new StringBuilder(8);
-
-        //    bitsString.Append(Convert.ToString((byteIn / 128) % 2));
-        //    bitsString.Append(Convert.ToString((byteIn / 64) % 2));
-        //    bitsString.Append(Convert.ToString((byteIn / 32) % 2));
-        //    bitsString.Append(Convert.ToString((byteIn / 16) % 2));
-        //    bitsString.Append(Convert.ToString((byteIn / 8) % 2));
-        //    bitsString.Append(Convert.ToString((byteIn / 4) % 2));
-        //    bitsString.Append(Convert.ToString((byteIn / 2) % 2));
-        //    bitsString.Append(Convert.ToString((byteIn / 1) % 2));
-
-        //    return bitsString.ToString();
-        //}
     }
 }

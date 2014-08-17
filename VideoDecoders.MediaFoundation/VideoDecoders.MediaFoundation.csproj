@@ -48,8 +48,10 @@
     <Reference Include="System.Windows.Forms" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="DirectShowAudio\AudioDataTrack.cs" />
-    <Compile Include="DirectShowAudio\DTSSourceParser.cs" />
+    <Compile Include="DirectShowAudio\AudioOutputFilter.cs" />
+    <Compile Include="DirectShowAudio\AudioRenderStream.cs" />
+    <Compile Include="DirectShowAudio\AudioSourceFilter.cs" />
+    <Compile Include="DirectShowAudio\AudioSourceStream.cs" />
     <Compile Include="DirectShowAudio\DirectShowAudioDecoderTransform.cs" />
     <Compile Include="DirectShowAudio\DirectShowAudioGraph.cs" />
     <Compile Include="DirectShowAudio\ExampleFilters.cs" />

@@ -24,6 +24,7 @@ namespace VideoDecoders.MediaFoundation.DirectShowAudio
 
         private IMFMediaType _inputType;
         private IMFMediaType _outputType;
+        private DirectShowAudioGraph _audioGraph;
 
         public int ProcessMessage(MFTMessageType eMessage, IntPtr ulParam)
         {
@@ -39,6 +40,7 @@ namespace VideoDecoders.MediaFoundation.DirectShowAudio
                     break;
                 // These are messages we can safely ignore
                 case MFTMessageType.SetD3DManager:
+                case MFTMessageType.NotifyStartOfStream:
                     break;
                 // We have not implemented these messages
                 default:
@@ -50,7 +52,14 @@ namespace VideoDecoders.MediaFoundation.DirectShowAudio
 
         private void Initialise()
         {
+            if(_audioGraph != null)
+            {
+                _audioGraph.Dispose();
+                _audioGraph = null;
+            }
 
+            _audioGraph = new DirectShowAudioGraph(_inputType, _outputType);
+            _audioGraph.Start().Throw();
         }
 
         public int GetStreamCount(MFInt pcInputStreams, MFInt pcOutputStreams)
@@ -285,7 +294,22 @@ namespace VideoDecoders.MediaFoundation.DirectShowAudio
 
         public int GetOutputStreamInfo(int dwOutputStreamID, out MFTOutputStreamInfo pStreamInfo)
         {
-            throw new NotImplementedException();
+            pStreamInfo = new MFTOutputStreamInfo();
+            if(dwOutputStreamID != 0)
+            {
+                return MFError.MF_E_INVALIDSTREAMNUMBER;
+            }
+
+            if(_outputType != null)
+            {
+                int blockAlignment;
+                TestSuccess("Could not get block alignment value", _outputType.GetUINT32(MFAttributesClsid.MF_MT_AUDIO_BLOCK_ALIGNMENT, out blockAlignment));
+
+                pStreamInfo.dwFlags = MFTOutputStreamInfoFlags.WholeSamples | MFTOutputStreamInfoFlags.ProvidesSamples;
+                pStreamInfo.cbAlignment = blockAlignment;
+            }
+
+            return S_Ok;
         }
 
         public int GetInputStatus(int dwInputStreamID, out MFTInputStatusFlags pdwFlags)
@@ -323,12 +347,30 @@ namespace VideoDecoders.MediaFoundation.DirectShowAudio
 
         public int ProcessInput(int dwInputStreamID, IMFSample pSample, int dwFlags)
         {
-            throw new NotImplementedException();
+            if (dwInputStreamID != 0)
+            {
+                return MFError.MF_E_INVALIDSTREAMNUMBER;
+            }
+
+            if (_inputType == null || _outputType == null)
+            {
+                return MFError.MF_E_TRANSFORM_TYPE_NOT_SET;
+            }
+
+            //_audioGraph.
+            return E_NotImplemented;
         }
 
         public int ProcessOutput(MFTProcessOutputFlags dwFlags, int cOutputBufferCount, MFTOutputDataBuffer[] pOutputSamples, out ProcessOutputStatus pdwStatus)
         {
-            throw new NotImplementedException();
+            pdwStatus = ProcessOutputStatus.None;
+            if(_inputType == null || _outputType == null)
+            {
+                return MFError.MF_E_TRANSFORM_TYPE_NOT_SET;
+            }
+
+            return MFError.MF_E_TRANSFORM_NEED_MORE_INPUT;
+            //return S_Ok;
         }
 
         public int SetOutputBounds(long hnsLowerBound, long hnsUpperBound)

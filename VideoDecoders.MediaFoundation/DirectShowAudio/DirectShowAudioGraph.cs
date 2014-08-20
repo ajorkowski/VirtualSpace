@@ -10,10 +10,18 @@ namespace VideoDecoders.MediaFoundation.DirectShowAudio
         private readonly MF.IMFMediaType _inputType;
         private readonly MF.IMFMediaType _outputType;
 
+        private AudioSourceFilter _sourceFilter;
+        private AudioOutputFilter _outputFilter;
+
         public DirectShowAudioGraph(MF.IMFMediaType inputType, MF.IMFMediaType outputType)
         {
             _inputType = inputType;
             _outputType = outputType;
+        }
+
+        public void PushData(MF.IMFSample sample)
+        {
+            _sourceFilter.PushData(sample);
         }
 
         protected override HRESULT OnInitInterfaces()
@@ -23,11 +31,13 @@ namespace VideoDecoders.MediaFoundation.DirectShowAudio
             capture.SetFiltergraph(m_GraphBuilder);
 
             // Input
-            var input = new DSBaseSourceFilter(new AudioSourceFilter(_inputType));
+            _sourceFilter = new AudioSourceFilter(_inputType);
+            var input = new DSBaseSourceFilter(_sourceFilter);
             input.FilterGraph = m_GraphBuilder;
 
             // Output
-            var output = new DSBaseWriterFilter(new AudioOutputFilter(_outputType));
+            _outputFilter = new AudioOutputFilter(_outputType);
+            var output = new DSBaseWriterFilter(_outputFilter);
             output.FilterGraph = m_GraphBuilder;
 
             // Build capture graph

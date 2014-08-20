@@ -357,8 +357,19 @@ namespace VideoDecoders.MediaFoundation.DirectShowAudio
                 return MFError.MF_E_TRANSFORM_TYPE_NOT_SET;
             }
 
-            //_audioGraph.
-            return E_NotImplemented;
+            long temp;
+            if (pSample.GetSampleDuration(out temp) != S_Ok) 
+            {
+                return MFError.MF_E_NO_SAMPLE_DURATION;
+            }
+
+            if (pSample.GetSampleTime(out temp) != S_Ok)
+            {
+                return MFError.MF_E_NO_SAMPLE_TIMESTAMP;
+            }
+
+            _audioGraph.PushData(pSample);
+            return S_Ok;
         }
 
         public int ProcessOutput(MFTProcessOutputFlags dwFlags, int cOutputBufferCount, MFTOutputDataBuffer[] pOutputSamples, out ProcessOutputStatus pdwStatus)

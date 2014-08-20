@@ -113,9 +113,12 @@ namespace VirtualSpace.Platform.Windows.Device
                 _trayMenu.Dispose();
             }
 
-            foreach (var o in _outputDevices)
+            if (_outputDevices != null)
             {
-                o.Dispose();
+                foreach (var o in _outputDevices)
+                {
+                    o.Dispose();
+                }
             }
         }
     }

@@ -1,7 +1,5 @@
 ﻿using DirectShow;
-using DirectShow.BaseClasses;
 using DirectShow.Helper;
-using System;
 using System.Runtime.InteropServices;
 using MF = MediaFoundation;
 

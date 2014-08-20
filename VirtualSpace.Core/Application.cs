@@ -20,11 +20,11 @@ namespace VirtualSpace.Core
 
         public void Run(string[] args)
         {
-            RefreshMenu();
-
             var devices = _deviceManager.GetDevices();
             if (devices != null)
             {
+                RefreshMenu();
+
                 if(args.Any())
                 {
                     _environment.WatchMovie(args[0]);

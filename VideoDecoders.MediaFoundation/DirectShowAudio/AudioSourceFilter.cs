@@ -87,6 +87,10 @@ namespace VideoDecoders.MediaFoundation.DirectShowAudio
             {
                 prop.cbBuffer = wfx.nBlockAlign * wfx.nSamplesPerSec;
             }
+            if(prop.cbBuffer == 0)
+            {
+                prop.cbBuffer = 24 * wfx.nSamplesPerSec;
+            }
             prop.cbAlign = wfx.nBlockAlign;
             prop.cBuffers = 3;
             int hr = pAlloc.SetProperties(prop, actual);

@@ -75,6 +75,8 @@ namespace VideoDecoders.MediaFoundation.Mkv
                                     continue;
                                 }
                                 return true;
+                            default:
+                                throw new InvalidOperationException("Do not support non-blocks in block group (yet!)");
                         }
                     }
                     else
@@ -103,6 +105,7 @@ namespace VideoDecoders.MediaFoundation.Mkv
                 if (_isInBlockGroup)
                 {
                     _reader.LeaveContainer();
+                    _isInBlockGroup = false;
                     continue;
                 }
 
@@ -132,11 +135,11 @@ namespace VideoDecoders.MediaFoundation.Mkv
                 throw new InvalidOperationException("The cluster does not have a timecode - invalid");
             }
 
-            if (!isSimple)
-            {
-                // TODO: Implement Block reading
-                throw new NotImplementedException();
-            }
+            //if (!isSimple)
+            //{
+            //    // TODO: Implement Block reading
+            //    throw new NotImplementedException();
+            //}
 
             var trackNumber = (int)_reader.ReadVarIntInline(8).Value;
             var timecode = _reader.ReadSignedIntegerInline(2) * (long)Metadata.Info.TimecodeScale;

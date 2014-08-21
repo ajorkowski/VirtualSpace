@@ -24,36 +24,33 @@ namespace VideoDecoders.MediaFoundation.Mkv
 
         protected override IMFMediaType CreateMediaType(TrackEntry entry)
         {
-            Guid subtype;
-            switch (entry.CodecID)
-            {
-                case "V_MPEG4/ISO/AVC":
-                    if (entry.CodecPrivate == null) { throw new InvalidOperationException("Must have private information in mkv to decode H264 streams"); }
-                    ParseAVCCFormatHeader(entry.CodecPrivate);
-
-                    subtype = MFMediaType.H264;
-                    break;
-                default:
-                    return null;
-            }
-
             IMFMediaType type;
             TestSuccess("Could not create media type", MFExtern.MFCreateMediaType(out type));
 
             TestSuccess("Could not set video type", type.SetGUID(MFAttributesClsid.MF_MT_MAJOR_TYPE, MFMediaType.Video));
 
-            TestSuccess("Could not set video subtype", type.SetGUID(MFAttributesClsid.MF_MT_SUBTYPE, subtype));
+            switch (entry.CodecID)
+            {
+                case "V_MPEG4/ISO/AVC":
+                    if (entry.CodecPrivate == null) { throw new InvalidOperationException("Expecting private information in mkv to decode H264 streams"); }
+                    ParseAVCCFormatHeader(entry.CodecPrivate);
 
-            TestSuccess("Could not set video size", type.SetUINT64(MFAttributesClsid.MF_MT_FRAME_SIZE, MakeLong((int)entry.Video.DisplayWidth, (int)entry.Video.DisplayHeight)));
-            TestSuccess("Could not set pixel aspect ratio", type.SetUINT64(MFAttributesClsid.MF_MT_PIXEL_ASPECT_RATIO, MakeLong(1, 1)));
-            TestSuccess("Could not set interlace mode", type.SetUINT32(MFAttributesClsid.MF_MT_INTERLACE_MODE, (int)MFVideoInterlaceMode.MixedInterlaceOrProgressive));
+                    TestSuccess("Could not set video subtype", type.SetGUID(MFAttributesClsid.MF_MT_SUBTYPE, MFMediaType.H264));
+
+                    TestSuccess("Could not set video size", type.SetUINT64(MFAttributesClsid.MF_MT_FRAME_SIZE, MakeLong((int)entry.Video.DisplayWidth, (int)entry.Video.DisplayHeight)));
+                    TestSuccess("Could not set pixel aspect ratio", type.SetUINT64(MFAttributesClsid.MF_MT_PIXEL_ASPECT_RATIO, MakeLong(1, 1)));
+                    TestSuccess("Could not set interlace mode", type.SetUINT32(MFAttributesClsid.MF_MT_INTERLACE_MODE, (int)MFVideoInterlaceMode.MixedInterlaceOrProgressive));
+                    break;
+                default:
+                    return null;
+            }
 
             return type;
         }
 
-        public override IMFMediaBuffer CreateBufferFromBlock(int blockDataSize, Func<byte[], int, int, int> readBlockDataFunc)
+        public override IMFMediaBuffer CreateBufferFromBlock(int blockDataSize, Func<byte[], int, int, int> readBlockDataFunc, ref MkvBlockHeader header)
         {
-            int bufferRealLength = blockDataSize + _codecPrivateData.Length;
+            int bufferRealLength = header.KeyFrame ? blockDataSize + _codecPrivateData.Length : blockDataSize;
             IMFMediaBuffer buffer;
             TestSuccess("Could not create media buffer", MFExtern.MFCreateMemoryBuffer(bufferRealLength, out buffer));
 
@@ -65,9 +62,12 @@ namespace VideoDecoders.MediaFoundation.Mkv
             {
                 using (var buffStream = new UnmanagedMemoryStream((byte*)bufferPtr.ToPointer(), bufferRealLength, bufferRealLength, FileAccess.Write))
                 {
-                    // We have to dump the PPS/SPS information in every frame...
-                    buffStream.Write(_codecPrivateData, 0, _codecPrivateData.Length);
-                    currentLength += _codecPrivateData.Length;
+                    if(header.KeyFrame)
+                    {
+                        // We have to dump the PPS/SPS information in every frame...
+                        buffStream.Write(_codecPrivateData, 0, _codecPrivateData.Length);
+                        currentLength += _codecPrivateData.Length;
+                    }
 
                     int replaceToken = 0;
                     while (blockDataSize > 0)

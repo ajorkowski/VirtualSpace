@@ -20,6 +20,7 @@ namespace VideoDecoders.MediaFoundation.Mkv
         // Cluster/block tracking
         private ulong _currentClusterTimecode;
         private bool _isInBlockGroup;
+        private bool _hasAccessedBlock;
         private byte[] _blockHeaderBuffer;
 
         public MkvDecoder(Stream stream, StreamMetadata streamMetadata)
@@ -36,11 +37,22 @@ namespace VideoDecoders.MediaFoundation.Mkv
         public MkvMetadata Metadata { get { return _metadata; } }
         public StreamMetadata StreamMetadata { get { return _streamMetadata; } }
 
-        public bool SeekNextBlock(List<int> validTracks, ref MkvBlockHeader header)
+        public bool SeekNextBlock(List<int> validTracks, ref MkvBlockHeader header, bool additionalBlockDetailsPhase)
         {
             if(_hasFinished)
             {
                 return false;
+            }
+
+            if (additionalBlockDetailsPhase && _isInBlockGroup && !_hasAccessedBlock)
+            {
+                throw new InvalidOperationException("Invalid state - in block group without accessing block first");
+            }
+
+            // If we are not in a block group then there is no additional data
+            if(additionalBlockDetailsPhase && !_isInBlockGroup)
+            {
+                return true;
             }
 
             while (true)
@@ -68,8 +80,15 @@ namespace VideoDecoders.MediaFoundation.Mkv
                         // Block Group reading
                         switch (descriptor.Name)
                         {
+                            case "ReferenceBlock":
+                                header.ReferenceTimeCode = (ulong)((long)header.TimeCode + _reader.ReadInt() * (long)Metadata.Info.TimecodeScale);
+                                break;
+                            case "BlockDuration":
+                                header.Duration = _reader.ReadUInt() * Metadata.Info.TimecodeScale;
+                                break;
                             case "Block":
                                 ReadBlockHeader(false, ref header);
+                                _hasAccessedBlock = true;
                                 if (!validTracks.Contains(header.TrackNumber))
                                 {
                                     continue;
@@ -106,7 +125,15 @@ namespace VideoDecoders.MediaFoundation.Mkv
                 {
                     _reader.LeaveContainer();
                     _isInBlockGroup = false;
-                    continue;
+                    _hasAccessedBlock = false;
+                    if(additionalBlockDetailsPhase)
+                    {
+                        return true;
+                    }
+                    else
+                    {
+                        continue;
+                    }
                 }
 
                 _reader.LeaveContainer();
@@ -134,12 +161,6 @@ namespace VideoDecoders.MediaFoundation.Mkv
             {
                 throw new InvalidOperationException("The cluster does not have a timecode - invalid");
             }
-
-            //if (!isSimple)
-            //{
-            //    // TODO: Implement Block reading
-            //    throw new NotImplementedException();
-            //}
 
             var trackNumber = (int)_reader.ReadVarIntInline(8).Value;
             var timecode = _reader.ReadSignedIntegerInline(2) * (long)Metadata.Info.TimecodeScale;
@@ -181,6 +202,8 @@ namespace VideoDecoders.MediaFoundation.Mkv
             {
                 throw new NotImplementedException();
             }
+
+            header.NeedsNextPhase = !isSimple;
         }
 
         private MkvMetadata GetMetadata()

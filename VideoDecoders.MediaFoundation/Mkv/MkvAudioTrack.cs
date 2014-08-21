@@ -36,6 +36,9 @@ namespace VideoDecoders.MediaFoundation.Mkv
                 case "A_AC3":
                     subtype = MediaSubTypes.MEDIASUBTYPE_DOLBY_AC3;
                     break;
+                case "A_AAC":
+                    subtype = MFMediaType.AAC;
+                    break;
                 default:
                     return null;
             }
@@ -56,7 +59,7 @@ namespace VideoDecoders.MediaFoundation.Mkv
             return type;
         }
 
-        public override IMFMediaBuffer CreateBufferFromBlock(int blockDataSize, Func<byte[], int, int, int> readBlockDataFunc)
+        public override IMFMediaBuffer CreateBufferFromBlock(int blockDataSize, Func<byte[], int, int, int> readBlockDataFunc, ref MkvBlockHeader header)
         {
             IMFMediaBuffer buffer;
             TestSuccess("Could not create media buffer", MFExtern.MFCreateMemoryBuffer(blockDataSize, out buffer));

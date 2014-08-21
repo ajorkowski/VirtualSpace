@@ -13,6 +13,6 @@ namespace VideoDecoders.MediaFoundation.Mkv
 
         bool ProcessSample();
 
-        IMFMediaBuffer CreateBufferFromBlock(int blockDataSize, Func<byte[], int, int, int> readBlockDataFunc);
+        IMFMediaBuffer CreateBufferFromBlock(int blockDataSize, Func<byte[], int, int, int> readBlockDataFunc, ref MkvBlockHeader header);
     }
 }

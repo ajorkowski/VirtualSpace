@@ -182,7 +182,7 @@ namespace VideoDecoders.MediaFoundation.Mkv
             while (true)
             {
                 MkvBlockHeader header = new MkvBlockHeader();
-                if (!_decoder.SeekNextBlock(_validTrackNumbers, ref header))
+                if (!_decoder.SeekNextBlock(_validTrackNumbers, ref header, false))
                 {
                     return null;
                 }
@@ -190,13 +190,27 @@ namespace VideoDecoders.MediaFoundation.Mkv
                 IMFSample sample;
                 TestSuccess("Could not create media sample", MFExtern.MFCreateSample(out sample));
 
-                sample.SetSampleTime((long)(header.TimeCode / 100));
-                sample.SetSampleDuration((long)(header.Duration / 100));
-
                 var trackObj = _tracks.First(t => (int)t.Metadata.TrackNumber == header.TrackNumber);
-                var buffer = trackObj.CreateBufferFromBlock((int)_decoder.RemainingBlockSize, _decoder.ReadBlock);
+                var buffer = trackObj.CreateBufferFromBlock((int)_decoder.RemainingBlockSize, _decoder.ReadBlock, ref header);
 
                 TestSuccess("Could not attach buffer to sample", sample.AddBuffer(buffer));
+
+                // Second pass incase we need to finish the header information...
+                if (header.NeedsNextPhase)
+                {
+                    if (!_decoder.SeekNextBlock(_validTrackNumbers, ref header, true))
+                    {
+                        throw new InvalidOperationException("Expected second phase to be successful");
+                    }
+                }
+
+                if (header.KeyFrame) 
+                {
+                    sample.SetUINT32(MFAttributesClsid.MFSampleExtension_CleanPoint, 1);
+                }
+
+                sample.SetSampleTime((long)(header.TimeCode / 100));
+                sample.SetSampleDuration((long)(header.Duration / 100));
 
                 if (header.TrackNumber == track)
                 {

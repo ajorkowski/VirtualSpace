@@ -56,7 +56,7 @@ namespace VideoDecoders.MediaFoundation.Mkv
         }
 
         protected abstract IMFMediaType CreateMediaType(TrackEntry entry);
-        public abstract IMFMediaBuffer CreateBufferFromBlock(int blockDataSize, Func<byte[], int, int, int> readBlockDataFunc);
+        public abstract IMFMediaBuffer CreateBufferFromBlock(int blockDataSize, Func<byte[], int, int, int> readBlockDataFunc, ref MkvBlockHeader header);
 
         public bool ProcessSample()
         {

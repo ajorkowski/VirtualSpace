@@ -95,7 +95,13 @@ namespace VirtualSpace.Platform.Windows.Video
             // Enable default streams...
             _reader.SetStreamSelection(SourceReaderIndex.AllStreams, false);
             _reader.SetStreamSelection(SourceReaderIndex.FirstVideoStream, true);
-            _reader.SetStreamSelection(SourceReaderIndex.FirstAudioStream, true);
+
+            // Audio is optional, we might not even have a stream...
+            try
+            {
+                _reader.SetStreamSelection(SourceReaderIndex.FirstAudioStream, true);
+            }
+            catch (SharpDXException) { }
 
             // Grab out some metadata...
             _canSeek = GetCanSeek(_reader);

@@ -204,7 +204,7 @@ namespace VideoDecoders.MediaFoundation.Mkv
                     }
                 }
 
-                if (header.KeyFrame) 
+                if (header.KeyFrame || header.ReferenceTimeCode == 0) 
                 {
                     sample.SetUINT32(MFAttributesClsid.MFSampleExtension_CleanPoint, 1);
                 }

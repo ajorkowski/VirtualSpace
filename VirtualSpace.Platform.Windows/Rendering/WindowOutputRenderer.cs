@@ -32,9 +32,9 @@ namespace VirtualSpace.Platform.Windows.Rendering
 #endif
 
             _device = new GraphicsDeviceManager(this);
-//#if DEBUG
-//            _device.DeviceCreationFlags = SharpDX.Direct3D11.DeviceCreationFlags.Debug;
-//#endif
+#if DEBUG
+            _device.DeviceCreationFlags = _device.DeviceCreationFlags | SharpDX.Direct3D11.DeviceCreationFlags.Debug;
+#endif
 
             Content.RootDirectory = "Content";
 

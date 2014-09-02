@@ -59,7 +59,7 @@ namespace VideoDecoders.MediaFoundation.DirectShowAudio
             }
 
             _audioGraph = new DirectShowAudioGraph(_inputType, _outputType);
-            _audioGraph.Start().Throw();
+            _audioGraph.Start();
         }
 
         public int GetStreamCount(MFInt pcInputStreams, MFInt pcOutputStreams)
@@ -380,8 +380,21 @@ namespace VideoDecoders.MediaFoundation.DirectShowAudio
                 return MFError.MF_E_TRANSFORM_TYPE_NOT_SET;
             }
 
-            return MFError.MF_E_TRANSFORM_NEED_MORE_INPUT;
-            //return S_Ok;
+            var sample = _audioGraph.TryGetData();
+            if (sample == null)
+            {
+                return MFError.MF_E_TRANSFORM_NEED_MORE_INPUT;
+            }
+
+            pOutputSamples[0].dwStatus = MFTOutputDataBufferFlags.None;
+            pOutputSamples[0].pSample = Marshal.GetIUnknownForObject(sample);
+
+            Marshal.AddRef(pOutputSamples[0].pSample);
+
+            Marshal.ReleaseComObject(sample);
+            sample = null;
+
+            return S_Ok;
         }
 
         public int SetOutputBounds(long hnsLowerBound, long hnsUpperBound)

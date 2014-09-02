@@ -11,15 +11,19 @@ namespace VideoDecoders.MediaFoundation.DirectShowAudio
     public class AudioSourceFilter : BaseSourceFilter
     {
         private readonly AMMediaType _mediaType;
-        private readonly ConcurrentQueue<MF.IMFSample> _samples;
+        
+        private readonly ManualResetEvent _intputSync;
+        private readonly ManualResetEvent _outputSync;
 
+        private MF.IMFSample _sample;
         private bool _isDone;
         private long _lastSampleTime;
 
         public AudioSourceFilter(MF.IMFMediaType mediaType)
             : base("Audio Source Filter")
         {
-            _samples = new ConcurrentQueue<MF.IMFSample>();
+            _intputSync = new ManualResetEvent(true);
+            _outputSync = new ManualResetEvent(false);
 
             Guid subType;
             mediaType.GetGUID(MF.MFAttributesClsid.MF_MT_SUBTYPE, out subType);
@@ -51,17 +55,25 @@ namespace VideoDecoders.MediaFoundation.DirectShowAudio
             AMMediaType.SetFormat(ref _mediaType, ref pwfx);
         }
 
-        public void PushData(MF.IMFSample sample)
+        public void PushSample(MF.IMFSample sample)
         {
+            while(_sample != null)
+            {
+                _intputSync.Reset();
+                _intputSync.WaitOne(500);
+            }
+
             if (sample == null)
             {
                 _isDone = true;
             }
             else
             {
-                _samples.Enqueue(sample);
                 _isDone = false;
+                _sample = sample;
             }
+
+            _outputSync.Set();
         }
 
         public override int Pause()
@@ -106,15 +118,14 @@ namespace VideoDecoders.MediaFoundation.DirectShowAudio
 
         public int FillBuffer(ref IMediaSampleImpl outSample)
         {
-            MF.IMFSample sample;
             try
             {
                 while (true)
                 {
-                    if (_samples.TryDequeue(out sample))
+                    if(_sample != null)
                     {
                         MF.IMFMediaBuffer buffer;
-                        var hr = sample.ConvertToContiguousBuffer(out buffer);
+                        var hr = _sample.ConvertToContiguousBuffer(out buffer);
                         if (hr != S_OK) { return hr; }
 
                         IntPtr outPtr;
@@ -141,18 +152,31 @@ namespace VideoDecoders.MediaFoundation.DirectShowAudio
                         hr = outSample.SetActualDataLength(length);
                         if (hr != S_OK) { return hr; }
 
-                        hr = outSample.SetSyncPoint(true);
+                        int hasSyncPoint;
+                        _sample.GetUINT32(MF.MFAttributesClsid.MFSampleExtension_CleanPoint, out hasSyncPoint);
+                        hr = outSample.SetSyncPoint(hasSyncPoint == 1);
                         if (hr != S_OK) { return hr; }
 
-                        long stop = 
+                        long duration;
+                        _sample.GetSampleDuration(out duration);
+
+                        long stop = _lastSampleTime + duration;
+                        hr = outSample.SetTime((DsLong)_lastSampleTime, (DsLong)stop);
+                        if (hr != S_OK) { return hr; }
+                        _lastSampleTime = stop;
 
                         Marshal.ReleaseComObject(buffer);
-                        Marshal.ReleaseComObject(sample);
+                        Marshal.ReleaseComObject(_sample);
+                        _sample = null;
+
+                        _intputSync.Set();
+                        return NOERROR;
                     }
                     else
                     {
                         if (_isDone) { return S_FALSE; }
-                        Thread.Sleep(5); // Wait for more data!
+                        _outputSync.Reset();
+                        _outputSync.WaitOne(500);
                     }
                 }
             }
@@ -160,22 +184,6 @@ namespace VideoDecoders.MediaFoundation.DirectShowAudio
             {
                 return VFW_E_RUNTIME_ERROR;
             }
-            //BitmapInfoHeader _bmi = (BitmapInfoHeader)Pins[0].CurrentMediaType;
-            
-            //IntPtr _ptr;
-            //_sample.GetPointer(out _ptr);
-            //Bitmap _bmp = new Bitmap(_bmi.Width, _bmi.Height, _bmi.Width * 4, PixelFormat.Format32bppRgb, _ptr);
-            //Graphics _graphics = Graphics.FromImage(_bmp);
-
-            //_graphics.DrawImage(m_pBitmap, new Rectangle(0, 0, _bmp.Width, _bmp.Height), 0, 0, m_pBitmap.Width, m_pBitmap.Height,GraphicsUnit.Pixel);
-            //_graphics.Dispose();
-            //_bmp.Dispose();
-            //_sample.SetActualDataLength(_bmi.ImageSize);
-            //_sample.SetSyncPoint(true);
-            //long _stop = m_lLastSampleTime + m_nAvgTimePerFrame;
-            //_sample.SetTime((DsLong)m_lLastSampleTime, (DsLong)_stop);
-            //m_lLastSampleTime = _stop;
-            //return NOERROR;
         }
 
         [DllImport("kernel32.dll", EntryPoint = "CopyMemory", SetLastError = false)]

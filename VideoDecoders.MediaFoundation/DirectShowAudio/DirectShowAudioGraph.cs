@@ -1,5 +1,6 @@
 ﻿using DirectShow;
 using DirectShow.Helper;
+using System.Collections.Concurrent;
 using System.Runtime.InteropServices;
 using MF = MediaFoundation;
 
@@ -9,6 +10,7 @@ namespace VideoDecoders.MediaFoundation.DirectShowAudio
     {
         private readonly MF.IMFMediaType _inputType;
         private readonly MF.IMFMediaType _outputType;
+        private readonly ConcurrentQueue<MF.IMFSample> _outputQueue;
 
         private AudioSourceFilter _sourceFilter;
         private AudioOutputFilter _outputFilter;
@@ -17,11 +19,20 @@ namespace VideoDecoders.MediaFoundation.DirectShowAudio
         {
             _inputType = inputType;
             _outputType = outputType;
+
+            _outputQueue = new ConcurrentQueue<MF.IMFSample>();
         }
 
         public void PushData(MF.IMFSample sample)
         {
-            _sourceFilter.PushData(sample);
+            _sourceFilter.PushSample(sample);
+        }
+
+        public MF.IMFSample TryGetData()
+        {
+            MF.IMFSample possible;
+            _outputQueue.TryDequeue(out possible);
+            return possible;
         }
 
         protected override HRESULT OnInitInterfaces()
@@ -36,7 +47,7 @@ namespace VideoDecoders.MediaFoundation.DirectShowAudio
             input.FilterGraph = m_GraphBuilder;
 
             // Output
-            _outputFilter = new AudioOutputFilter(_outputType);
+            _outputFilter = new AudioOutputFilter(_outputType, _outputQueue);
             var output = new DSBaseWriterFilter(_outputFilter);
             output.FilterGraph = m_GraphBuilder;
 

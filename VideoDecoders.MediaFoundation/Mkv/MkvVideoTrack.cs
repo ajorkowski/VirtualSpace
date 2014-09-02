@@ -50,7 +50,8 @@ namespace VideoDecoders.MediaFoundation.Mkv
 
         public override IMFMediaBuffer CreateBufferFromBlock(int blockDataSize, Func<byte[], int, int, int> readBlockDataFunc, ref MkvBlockHeader header)
         {
-            int bufferRealLength = header.KeyFrame ? blockDataSize + _codecPrivateData.Length : blockDataSize;
+            bool isKeyFrame = header.KeyFrame || header.ReferenceTimeCode == 0;
+            int bufferRealLength = isKeyFrame ? blockDataSize + _codecPrivateData.Length : blockDataSize;
             IMFMediaBuffer buffer;
             TestSuccess("Could not create media buffer", MFExtern.MFCreateMemoryBuffer(bufferRealLength, out buffer));
 
@@ -62,7 +63,7 @@ namespace VideoDecoders.MediaFoundation.Mkv
             {
                 using (var buffStream = new UnmanagedMemoryStream((byte*)bufferPtr.ToPointer(), bufferRealLength, bufferRealLength, FileAccess.Write))
                 {
-                    if(header.KeyFrame)
+                    if (isKeyFrame)
                     {
                         // We have to dump the PPS/SPS information in every frame...
                         buffStream.Write(_codecPrivateData, 0, _codecPrivateData.Length);

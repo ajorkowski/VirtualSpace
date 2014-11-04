@@ -23,15 +23,9 @@ namespace VirtualSpace.Platform.Windows.Rendering.Providers
 
         public void UseOcculusEye(ref EyeRenderDesc desc, ref PoseF pose)
         {
-            // Calculate view matrix
-            _view = Matrix.Translation(desc.ViewAdjust) * Matrix.RotationQuaternion(pose.Orientation) * Matrix.Translation(pose.Position * -Vector3.UnitZ) * base.View;
-
-            //var rollPitchYaw = Matrix.RotationY(eyeYaw);
-            //var finalRollPitchYaw = rollPitchYaw * Matrix.RotationQuaternion(pose.Orientation);
-            //var finalUp = Vector3.TransformNormal(new Vector3(0, 1, 0), finalRollPitchYaw);
-            //var finalForward = Vector3.TransformNormal(new Vector3(0, 0, 1), finalRollPitchYaw);
-            //var shiftedEyePos = eyePos + Vector3.TransformNormal(pose.Position * -Vector3.UnitZ, rollPitchYaw);
-            //_view = Matrix.Translation(desc.ViewAdjust) * Matrix.LookAtRH(shiftedEyePos, shiftedEyePos + finalForward, finalUp);
+            var rot = Matrix.RotationQuaternion(pose.Orientation);
+            rot.Transpose();
+            _view = base.View * rot * Matrix.Translation(desc.ViewAdjust);
 
             // Calculate projection matrix
             _projection = OVR.MatrixProjection(desc.Fov, 0.01f, 200.0f, true);

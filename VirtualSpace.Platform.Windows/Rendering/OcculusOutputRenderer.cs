@@ -31,7 +31,6 @@ namespace VirtualSpace.Platform.Windows.Rendering
         private D3D11TextureData[] _eyeTexture;
 
         private RenderTarget2D _renderTarget;
-        private RenderTargetView _renderTargetView;
         private ShaderResourceView _renderTargetSRView;
         private DepthStencilBuffer _depthStencilBuffer;
         private EyeRenderDesc[] _eyeRenderDesc;
@@ -93,6 +92,8 @@ namespace VirtualSpace.Platform.Windows.Rendering
             _screenManager = ToDispose(new ScreenManager(this, _cameraProvider));
             _fpsRenderer = ToDispose(new FpsRenderer(this, _debugger));
 
+            _hmd.RecenterPose();
+
             // Attach HMD to window
             var control = (System.Windows.Forms.Control)Window.NativeWindow;
             _hmd.AttachToWindow(control.Handle);
@@ -100,7 +101,6 @@ namespace VirtualSpace.Platform.Windows.Rendering
             // Create our render target
             var renderTargetSize = _hmd.GetDefaultRenderTargetSize(1.5f);
             _renderTarget = ToDispose(RenderTarget2D.New(GraphicsDevice, renderTargetSize.Width, renderTargetSize.Height, new MipMapCount(1), PixelFormat.R8G8B8A8.UNorm, TextureFlags.RenderTarget | TextureFlags.ShaderResource));
-            _renderTargetView = ToDispose((RenderTargetView)_renderTarget);
             _renderTargetSRView = ToDispose((ShaderResourceView)_renderTarget);
 
             // Create a depth stencil buffer for our render target

@@ -222,8 +222,6 @@ namespace VirtualSpace.Platform.Windows.Rendering.Screen
             }
 
             _source.Update(gameTime);
-            _basicEffect.View = _cameraService.View;
-            _basicEffect.Projection = _cameraService.Projection;
 
             if (_speakerOutputs.Count > 0)
             {
@@ -277,6 +275,9 @@ namespace VirtualSpace.Platform.Windows.Rendering.Screen
         public override void Draw(GameTime gameTime)
         {
             base.Draw(gameTime);
+
+            _basicEffect.View = _cameraService.View;
+            _basicEffect.Projection = _cameraService.Projection;
 
             if (_renderMutex == null)
             {

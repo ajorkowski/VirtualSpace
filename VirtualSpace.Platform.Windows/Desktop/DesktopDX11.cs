@@ -8,6 +8,7 @@ using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
 using VirtualSpace.Core.Desktop;
+using VirtualSpace.Platform.Windows.Rendering;
 using VirtualSpace.Platform.Windows.Rendering.Screen;
 
 namespace VirtualSpace.Platform.Windows.Screen
@@ -58,7 +59,7 @@ namespace VirtualSpace.Platform.Windows.Screen
                     {
                         using (var factory = new Factory1())
                         using (var output = new Output1(factory.Adapters1[0].Outputs[0].NativePointer))
-                        using (var device = new SharpDX.Direct3D11.Device(DriverType.Hardware))
+                        using (var device = D3D11Device.CreateDevice())
                         using (var dupl = output.DuplicateOutput(device))
                         {
                             _isSupported = true;
@@ -103,7 +104,7 @@ namespace VirtualSpace.Platform.Windows.Screen
                 Usage = ResourceUsage.Default
             }));
 
-            _captureDevice = AddDisposable(new SharpDX.Direct3D11.Device(DriverType.Hardware));
+            _captureDevice = AddDisposable(D3D11Device.CreateDevice());
             using (var sharedResource = renderTexture.QueryInterface<SharpDX.DXGI.Resource>())
             {
                 _sharedTexture = AddDisposable(_captureDevice.OpenSharedResource<Texture2D>(sharedResource.SharedHandle));

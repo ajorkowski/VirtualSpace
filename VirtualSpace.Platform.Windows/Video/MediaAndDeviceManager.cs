@@ -7,6 +7,7 @@ using SharpDX.X3DAudio;
 using SharpDX.XAudio2;
 using System;
 using VideoDecoders.MediaFoundation;
+using VirtualSpace.Platform.Windows.Rendering;
 
 #if Win7
 using SharpDX.MediaFoundation.DirectX;
@@ -97,7 +98,7 @@ namespace VirtualSpace.Platform.Windows.Video
 #endif
 
             // Fallback software device
-            return new VideoDevice(VideoMode.Software, null, new SharpDX.Direct3D11.Device(DriverType.Hardware, DeviceCreationFlags.BgraSupport), null);
+            return new VideoDevice(VideoMode.Software, null, D3D11Device.CreateDevice(DeviceCreationFlags.BgraSupport), null);
         }
 
         public void Dispose()
@@ -150,7 +151,7 @@ namespace VirtualSpace.Platform.Windows.Video
                 }
 
                 // Use default dx11 devices that will be able to chat to dx9?
-                device = new SharpDX.Direct3D11.Device(DriverType.Hardware, DeviceCreationFlags.BgraSupport);
+                device = D3D11Device.CreateDevice(DeviceCreationFlags.BgraSupport);
             }
             catch (Exception)
             {
@@ -185,7 +186,7 @@ namespace VirtualSpace.Platform.Windows.Video
             SharpDX.Direct3D11.Device device = null;
             try
             {
-                device = new SharpDX.Direct3D11.Device(DriverType.Hardware, DeviceCreationFlags.BgraSupport | DeviceCreationFlags.VideoSupport);
+                device = D3D11Device.CreateDevice(DeviceCreationFlags.BgraSupport | DeviceCreationFlags.VideoSupport);
 
                 //Add multi thread protection on device
                 using (var mt = device.QueryInterface<DeviceMultithread>())

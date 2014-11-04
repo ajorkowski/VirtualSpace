@@ -78,6 +78,7 @@
     <Compile Include="Device\SingletonApplicationEnforcer.cs" />
     <Compile Include="Device\WindowOutputDevice.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="Rendering\D3D11Device.cs" />
     <Compile Include="Rendering\FpsRenderer.cs" />
     <Compile Include="Rendering\OcculusOutputRenderer.cs" />
     <Compile Include="Rendering\Providers\CameraProvider.cs" />

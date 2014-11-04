@@ -7,6 +7,7 @@ using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 using VirtualSpace.Core;
 using VirtualSpace.Core.Desktop;
+using VirtualSpace.Platform.Windows.Rendering;
 using VirtualSpace.Platform.Windows.Rendering.Screen;
 
 namespace VirtualSpace.Platform.Windows.Screen
@@ -69,7 +70,7 @@ namespace VirtualSpace.Platform.Windows.Screen
 
             var renderTexture = AddDisposable(new SharpDX.Direct3D11.Texture2D(device, sharedDesc));
 
-            _captureDevice = AddDisposable(new SharpDX.Direct3D11.Device(SharpDX.Direct3D.DriverType.Hardware));
+            _captureDevice = AddDisposable(D3D11Device.CreateDevice());
             using (var sharedResource = renderTexture.QueryInterface<SharpDX.DXGI.Resource>())
             {
                 _sharedTexture = AddDisposable(_captureDevice.OpenSharedResource<Texture2D>(sharedResource.SharedHandle));
